@@ -1,6 +1,7 @@
 package fr.gateau.tvhome
 
 import android.content.Context
+import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.PixelFormat
 import android.graphics.drawable.GradientDrawable
@@ -10,35 +11,64 @@ import android.os.Looper
 import android.provider.Settings
 import android.view.Gravity
 import android.view.WindowManager
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.Toast
+import kotlin.concurrent.thread
 
 object Notifier {
     private val main = Handler(Looper.getMainLooper())
 
-    fun show(ctx: Context, title: String, message: String, seconds: Int) {
+    /** Si [camera] est renseigné, l'instantané HA est récupéré puis affiché dans la notif. */
+    fun show(ctx: Context, title: String, message: String, seconds: Int, camera: String = "") {
+        if (camera.isBlank()) {
+            display(ctx, title, message, seconds, null)
+            return
+        }
+        thread {
+            val cfg = ConfigStore.load(ctx)
+            val bmp = if (cfg.haUrl.isNotBlank() && cfg.haToken.isNotBlank())
+                HaClient(cfg.haUrl, cfg.haToken).snapshot(camera) else null
+            display(ctx, title, message, seconds, bmp)
+        }
+    }
+
+    private fun display(ctx: Context, title: String, message: String, seconds: Int, image: Bitmap?) {
         main.post {
             if (Build.VERSION.SDK_INT >= 23 && !Settings.canDrawOverlays(ctx)) {
                 Toast.makeText(ctx, "$title\n$message", Toast.LENGTH_LONG).show()
                 return@post
             }
             val wm = ctx.getSystemService(Context.WINDOW_SERVICE) as WindowManager
+            val w = Ui.dp(ctx, if (image != null) 440 else 400)
             val box = LinearLayout(ctx).apply {
                 orientation = LinearLayout.VERTICAL
-                setPadding(Ui.dp(ctx, 24), Ui.dp(ctx, 18), Ui.dp(ctx, 24), Ui.dp(ctx, 18))
                 background = GradientDrawable().apply {
-                    cornerRadius = Ui.dp(ctx, 16).toFloat()
-                    setColor(Color.parseColor("#E6141C2C"))
-                    setStroke(Ui.dp(ctx, 2), Ui.CARD_ON)
+                    cornerRadius = Ui.dp(ctx, 22).toFloat()
+                    setColor(Color.argb(0xE8, 0x1C, 0x1C, 0x1E))
+                    setStroke(Ui.dp(ctx, 1), Color.argb(0x50, 0xFF, 0xFF, 0xFF))
                 }
-                addView(Ui.text(ctx, title, 22f, Ui.CARD_ON, bold = true).apply { maxWidth = Ui.dp(ctx, 520) })
-                if (message.isNotBlank()) {
-                    addView(Ui.text(ctx, message, 18f).apply {
-                        maxWidth = Ui.dp(ctx, 520)
-                        setPadding(0, Ui.dp(ctx, 6), 0, 0)
-                    })
+                clipToOutline = true
+                if (image != null) {
+                    addView(ImageView(ctx).apply {
+                        setImageBitmap(image)
+                        scaleType = ImageView.ScaleType.CENTER_CROP
+                    }, LinearLayout.LayoutParams(w, w * 9 / 16))
                 }
+                val txt = LinearLayout(ctx).apply {
+                    orientation = LinearLayout.VERTICAL
+                    setPadding(Ui.dp(ctx, 22), Ui.dp(ctx, 16), Ui.dp(ctx, 22), Ui.dp(ctx, 18))
+                    addView(Ui.text(ctx, title, 20f, Color.WHITE, Ui.MEDIUM).apply { maxWidth = w })
+                    if (message.isNotBlank()) {
+                        addView(Ui.text(ctx, message, 16f, Ui.MUTED, Ui.LIGHT).apply {
+                            maxWidth = w
+                            setPadding(0, Ui.dp(ctx, 6), 0, 0)
+                        })
+                    }
+                }
+                addView(txt, LinearLayout.LayoutParams(w, LinearLayout.LayoutParams.WRAP_CONTENT))
                 alpha = 0f
+                translationX = Ui.dp(ctx, 40).toFloat()
             }
             @Suppress("DEPRECATION")
             val type = if (Build.VERSION.SDK_INT >= 26) WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
@@ -58,9 +88,12 @@ object Notifier {
             }
             try {
                 wm.addView(box, lp)
-                box.animate().alpha(1f).setDuration(200).start()
-                main.postDelayed({ try { wm.removeView(box) } catch (e: Exception) {} },
-                    seconds.coerceIn(2, 120) * 1000L)
+                box.animate().alpha(1f).translationX(0f).setDuration(260).start()
+                main.postDelayed({
+                    box.animate().alpha(0f).setDuration(250).withEndAction {
+                        try { wm.removeView(box) } catch (e: Exception) {}
+                    }.start()
+                }, seconds.coerceIn(2, 120) * 1000L)
             } catch (e: Exception) {
                 Toast.makeText(ctx, "$title\n$message", Toast.LENGTH_LONG).show()
             }

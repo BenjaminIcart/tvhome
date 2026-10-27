@@ -26,7 +26,6 @@ object ConfigStore {
         "com.amazon.amazonvideo.livingroom",
         "fr.tf1.mytf1",
         "fr.m6.m6replay.by",
-        "com.spotify.tv.android",
         "org.videolan.vlc",
     )
 

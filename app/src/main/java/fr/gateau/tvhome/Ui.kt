@@ -2,6 +2,8 @@ package fr.gateau.tvhome
 
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.Drawable
@@ -16,65 +18,95 @@ import android.widget.LinearLayout
 import android.widget.TextView
 
 object Ui {
-    val BG_TOP = Color.parseColor("#0B1220")
-    val BG_BOTTOM = Color.parseColor("#1A2438")
-    val CARD = Color.parseColor("#232E45")
-    val CARD_ON = Color.parseColor("#F5A623")
-    val ACCENT = Color.parseColor("#1565C0")
-    val MUTED = Color.parseColor("#9AA7C0")
+    val BLACK = Color.BLACK
+    val BAND = Color.argb(0xB0, 0x26, 0x26, 0x2A)
+    val TILE = Color.parseColor("#1C1C1E")
+    val TILE_ON = Color.parseColor("#3A3320")
+    val ON = Color.parseColor("#FFD60A")
+    val MUTED = Color.parseColor("#8E8E93")
+    val GLASS = Color.argb(0x2E, 0xFF, 0xFF, 0xFF)
+    val PILL = Color.argb(0x24, 0xFF, 0xFF, 0xFF)
+
+    val THIN: Typeface = Typeface.create("sans-serif-thin", Typeface.NORMAL)
+    val LIGHT: Typeface = Typeface.create("sans-serif-light", Typeface.NORMAL)
+    val MEDIUM: Typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
 
     fun dp(c: Context, v: Int): Int = (v * c.resources.displayMetrics.density).toInt()
 
-    fun text(c: Context, s: String, sp: Float, color: Int = Color.WHITE, bold: Boolean = false): TextView =
+    fun text(c: Context, s: String, sp: Float, color: Int = Color.WHITE, tf: Typeface = LIGHT): TextView =
         TextView(c).apply {
             text = s
             textSize = sp
             setTextColor(color)
-            if (bold) typeface = Typeface.DEFAULT_BOLD
+            typeface = tf
+            includeFontPadding = false
         }
 
     fun section(c: Context, title: String): TextView =
-        text(c, title, 22f, MUTED, bold = true).apply {
-            setPadding(dp(c, 4), dp(c, 24), 0, dp(c, 4))
+        text(c, title, 18f, MUTED, MEDIUM).apply {
+            setPadding(dp(c, 6), dp(c, 8), 0, 0)
         }
 
-    /** Ligne horizontale défilante. Renvoie (conteneur à ajouter, ligne où mettre les cartes). */
-    fun hrow(c: Context): Pair<View, LinearLayout> {
+    fun pill(c: Context, s: String): TextView = text(c, s, 18f, Color.WHITE, LIGHT).apply {
+        setPadding(dp(c, 18), dp(c, 9), dp(c, 18), dp(c, 9))
+        background = GradientDrawable().apply {
+            cornerRadius = dp(c, 50).toFloat()
+            setColor(PILL)
+        }
+    }
+
+    fun hrow(c: Context, padV: Int = 18): Pair<HorizontalScrollView, LinearLayout> {
         val row = LinearLayout(c).apply {
             orientation = LinearLayout.HORIZONTAL
-            setPadding(dp(c, 16), dp(c, 16), dp(c, 16), dp(c, 16))
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(c, 20), dp(c, padV), dp(c, 20), dp(c, padV))
             clipChildren = false
             clipToPadding = false
         }
         val hsv = HorizontalScrollView(c).apply {
             isHorizontalScrollBarEnabled = false
+            isFillViewport = false
             clipChildren = false
             clipToPadding = false
             isFocusable = false
+            descendantFocusability = ViewGroup.FOCUS_AFTER_DESCENDANTS
             addView(row)
         }
         return hsv to row
     }
 
-    fun card(c: Context, wDp: Int, hDp: Int, color: Int = CARD, onClick: () -> Unit): FrameLayout {
-        val bg = GradientDrawable().apply {
-            cornerRadius = dp(c, 14).toFloat()
-            setColor(color)
+    /** Carte focusable : agrandissement + reflet « verre » au focus, pas de bordure par tuile. */
+    fun card(
+        c: Context, wDp: Int, hDp: Int, color: Int = TILE, key: String? = null,
+        onFocus: ((Boolean) -> Unit)? = null, onClick: () -> Unit,
+    ): FrameLayout {
+        val radius = dp(c, 16).toFloat()
+        val glass = GradientDrawable(
+            GradientDrawable.Orientation.TOP_BOTTOM,
+            intArrayOf(Color.argb(0x40, 0xFF, 0xFF, 0xFF), Color.argb(0x0A, 0xFF, 0xFF, 0xFF))
+        ).apply {
+            cornerRadius = radius
+            setStroke(dp(c, 1), Color.argb(0x70, 0xFF, 0xFF, 0xFF))
         }
         return FrameLayout(c).apply {
-            layoutParams = LinearLayout.LayoutParams(dp(c, wDp), dp(c, hDp)).apply {
-                marginEnd = dp(c, 22)
+            tag = key
+            layoutParams = LinearLayout.LayoutParams(dp(c, wDp), dp(c, hDp)).apply { marginEnd = dp(c, 26) }
+            background = GradientDrawable().apply {
+                cornerRadius = radius
+                setColor(color)
             }
-            background = bg
             clipToOutline = true
             isFocusable = true
             isClickable = true
             setOnClickListener { onClick() }
             setOnFocusChangeListener { v, has ->
-                bg.setStroke(if (has) dp(c, 3) else 0, Color.WHITE)
-                v.animate().scaleX(if (has) 1.08f else 1f).scaleY(if (has) 1.08f else 1f)
-                    .setDuration(120).start()
-                v.elevation = if (has) 16f else 0f
+                foreground = if (has) glass else null
+                v.animate().scaleX(if (has) 1.12f else 1f).scaleY(if (has) 1.12f else 1f)
+                    .translationY(if (has) -dp(c, 6).toFloat() else 0f)
+                    .setInterpolator(android.view.animation.OvershootInterpolator(1.6f))
+                    .setDuration(220).start()
+                v.elevation = if (has) 24f else 0f
+                onFocus?.invoke(has)
             }
         }
     }
@@ -116,9 +148,37 @@ object Ui {
         }
     }
 
-    fun appCard(c: Context, pkg: String, wDp: Int = 300, hDp: Int = 170): FrameLayout? {
+    /** Couleur dominante (moyenne saturée) d'un drawable, pour la lueur ambiante. */
+    fun dominantColor(d: Drawable?): Int {
+        if (d == null) return Color.parseColor("#3A6FF7")
+        return try {
+            val bmp = Bitmap.createBitmap(12, 7, Bitmap.Config.ARGB_8888)
+            val cv = Canvas(bmp)
+            d.setBounds(0, 0, 12, 7)
+            d.draw(cv)
+            var r = 0L; var g = 0L; var b = 0L; var n = 0L
+            for (x in 0 until 12) for (y in 0 until 7) {
+                val p = bmp.getPixel(x, y)
+                if (Color.alpha(p) < 128) continue
+                r += Color.red(p); g += Color.green(p); b += Color.blue(p); n++
+            }
+            if (n == 0L) return Color.parseColor("#3A6FF7")
+            val hsv = FloatArray(3)
+            Color.RGBToHSV((r / n).toInt(), (g / n).toInt(), (b / n).toInt(), hsv)
+            hsv[1] = (hsv[1] * 1.4f).coerceAtMost(1f)
+            hsv[2] = hsv[2].coerceAtLeast(0.75f)
+            Color.HSVToColor(hsv)
+        } catch (e: Exception) {
+            Color.parseColor("#3A6FF7")
+        }
+    }
+
+    fun appCard(
+        c: Context, pkg: String, wDp: Int = 240, hDp: Int = 135,
+        onFocus: ((Boolean) -> Unit)? = null,
+    ): FrameLayout? {
         val name = label(c, pkg) ?: return null
-        val card = card(c, wDp, hDp) { launch(c, pkg) }
+        val card = card(c, wDp, hDp, TILE, key = pkg, onFocus = onFocus) { launch(c, pkg) }
         val b = banner(c, pkg)
         if (b != null) {
             card.addView(ImageView(c).apply {
@@ -126,27 +186,36 @@ object Ui {
                 scaleType = ImageView.ScaleType.FIT_XY
             }, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
         } else {
-            val col = LinearLayout(c).apply {
+            card.addView(LinearLayout(c).apply {
                 orientation = LinearLayout.VERTICAL
                 gravity = Gravity.CENTER
                 addView(ImageView(c).apply { setImageDrawable(icon(c, pkg)) },
-                    LinearLayout.LayoutParams(dp(c, 72), dp(c, 72)))
-                addView(text(c, name, 16f).apply {
+                    LinearLayout.LayoutParams(dp(c, 60), dp(c, 60)))
+                addView(text(c, name, 15f).apply {
                     gravity = Gravity.CENTER
                     setPadding(0, dp(c, 8), 0, 0)
                 })
-            }
-            card.addView(col, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+            }, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
         }
         return card
     }
 
-    fun labelCard(c: Context, title: String, wDp: Int, hDp: Int, color: Int, onClick: () -> Unit): FrameLayout =
-        card(c, wDp, hDp, color, onClick).apply {
-            addView(text(c, title, 22f, bold = true).apply { gravity = Gravity.CENTER },
-                FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
-        }
+    fun glyphCard(
+        c: Context, glyph: String, title: String, wDp: Int, hDp: Int, color: Int, key: String,
+        onFocus: ((Boolean) -> Unit)? = null, onClick: () -> Unit,
+    ): FrameLayout = card(c, wDp, hDp, color, key, onFocus, onClick).apply {
+        addView(LinearLayout(c).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            addView(text(c, glyph, 34f).apply { gravity = Gravity.CENTER })
+            addView(text(c, title, 15f, Color.WHITE, MEDIUM).apply {
+                gravity = Gravity.CENTER
+                setPadding(0, dp(c, 8), 0, 0)
+            })
+        }, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+    }
 
-    fun background(): GradientDrawable =
-        GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(BG_TOP, BG_BOTTOM))
+    fun background(): Drawable = GradientDrawable().apply { setColor(BLACK) }
+
+    fun gone(v: View, hide: Boolean) { v.visibility = if (hide) View.GONE else View.VISIBLE }
 }

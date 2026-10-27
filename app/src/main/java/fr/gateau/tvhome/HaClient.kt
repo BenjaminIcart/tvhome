@@ -21,8 +21,12 @@ class HaClient(base: String, private val token: String) {
             "sensor", "binary_sensor", "weather", "person", "device_tracker", "sun", "zone"
         )
 
-        fun isActionable(entity: String) = entity.substringBefore('.') !in READ_ONLY
+        fun isActionable(entity: String) = entity.substringBefore('.') !in READ_ONLY && !entity.startsWith("camera.")
+        fun httpClient(): OkHttpClient = http
     }
+
+    fun baseUrl() = base
+    fun authToken() = token
 
     fun state(entity: String): JSONObject? = try {
         val req = Request.Builder()
@@ -42,6 +46,7 @@ class HaClient(base: String, private val token: String) {
             "light", "switch", "fan", "input_boolean", "automation", "media_player", "cover" -> "$domain/toggle"
             "script", "scene" -> "$domain/turn_on"
             "button", "input_button" -> "$domain/press"
+            "vacuum" -> "vacuum/start"
             else -> "homeassistant/toggle"
         }
         return try {
@@ -56,4 +61,18 @@ class HaClient(base: String, private val token: String) {
             false
         }
     }
+}
+
+/** Instantané d'une caméra HA (camera_proxy). */
+fun HaClient.snapshot(entity: String): android.graphics.Bitmap? = try {
+    val req = okhttp3.Request.Builder()
+        .url("${baseUrl()}/api/camera_proxy/$entity")
+        .header("Authorization", "Bearer ${authToken()}")
+        .build()
+    HaClient.httpClient().newCall(req).execute().use { r ->
+        if (!r.isSuccessful) null
+        else r.body?.byteStream()?.let { android.graphics.BitmapFactory.decodeStream(it) }
+    }
+} catch (e: Exception) {
+    null
 }

@@ -26,7 +26,7 @@ class AppsActivity : Activity() {
             setPadding(Ui.dp(c, 56), Ui.dp(c, 32), Ui.dp(c, 56), Ui.dp(c, 32))
             clipChildren = false
         }
-        content.addView(Ui.text(c, "Toutes les applis", 36f, bold = true))
+        content.addView(Ui.text(c, "Toutes les applis", 40f, android.graphics.Color.WHITE, Ui.THIN).apply { setPadding(Ui.dp(c, 12), 0, 0, Ui.dp(c, 12)) })
 
         var row: LinearLayout? = null
         sorted.forEachIndexed { i, (pkg, _) ->

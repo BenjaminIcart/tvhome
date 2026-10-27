@@ -2,19 +2,23 @@ package fr.gateau.tvhome
 
 import android.app.Activity
 import android.content.Intent
+import android.graphics.Color
+import android.graphics.drawable.GradientDrawable
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.view.Gravity
+import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
+import android.widget.ImageView
 import android.widget.LinearLayout
-import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import org.json.JSONObject
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import kotlin.concurrent.thread
@@ -24,16 +28,23 @@ class MainActivity : Activity() {
     private var ha: HaClient? = null
     private val ui = Handler(Looper.getMainLooper())
 
+    private lateinit var root: FrameLayout
+    private lateinit var greet: TextView
     private lateinit var clock: TextView
     private lateinit var date: TextView
     private lateinit var weather: TextView
-    private lateinit var favRow: LinearLayout
-    private lateinit var tilesTitle: TextView
-    private lateinit var tilesBox: android.view.View
-    private lateinit var tilesRow: LinearLayout
+    private lateinit var homeTitle: TextView
+    private lateinit var homeBox: View
+    private lateinit var homeRow: LinearLayout
+    private lateinit var focusName: TextView
+    private lateinit var dockRow: LinearLayout
+    private lateinit var glow: GradientDrawable
 
     private class TileView(val card: FrameLayout, val state: TextView)
     private val tileViews = mutableMapOf<String, TileView>()
+    private val camViews = mutableMapOf<String, ImageView>()
+    private var lastKey: String? = null
+    private var camCounter = 0
 
     private val clockFmt = SimpleDateFormat("HH:mm", Locale.FRANCE)
     private val dateFmt = SimpleDateFormat("EEEE d MMMM", Locale.FRANCE)
@@ -43,12 +54,15 @@ class MainActivity : Activity() {
             val now = Date()
             clock.text = clockFmt.format(now)
             date.text = dateFmt.format(now).replaceFirstChar { it.uppercase() }
+            val h = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+            greet.text = when (h) { in 5..11 -> "Bonjour"; in 12..17 -> "Bon après-midi"; else -> "Bonsoir" }
             ui.postDelayed(this, 1000)
         }
     }
     private val haTick = object : Runnable {
         override fun run() {
-            refreshHa()
+            refreshHa(withCameras = camCounter % 2 == 0)
+            camCounter++
             ui.postDelayed(this, 10_000)
         }
     }
@@ -64,6 +78,7 @@ class MainActivity : Activity() {
         cfg = ConfigStore.load(this)
         ha = if (cfg.haUrl.isNotBlank() && cfg.haToken.isNotBlank()) HaClient(cfg.haUrl, cfg.haToken) else null
         populate()
+        camCounter = 0
         ui.post(clockTick)
         ui.post(haTick)
     }
@@ -75,7 +90,9 @@ class MainActivity : Activity() {
     }
 
     @Deprecated("Launcher : Retour ne quitte pas l'accueil")
-    override fun onBackPressed() { /* rien */ }
+    override fun onBackPressed() {
+        dockRow.getChildAt(0)?.requestFocus()
+    }
 
     private fun startBridge() {
         val i = Intent(this, BridgeService::class.java)
@@ -86,85 +103,161 @@ class MainActivity : Activity() {
 
     private fun buildLayout() {
         val c = this
+        root = FrameLayout(c).apply { setBackgroundColor(Ui.BLACK) }
+
+        // Lueur ambiante en bas, couleur de l'appli sélectionnée
+        glow = GradientDrawable().apply {
+            gradientType = GradientDrawable.RADIAL_GRADIENT
+            gradientRadius = Ui.dp(c, 520).toFloat()
+            setGradientCenter(0.3f, 1.0f)
+            colors = intArrayOf(Color.argb(0x55, 0x3A, 0x6F, 0xF7), Color.TRANSPARENT)
+        }
+        root.addView(View(c).apply { background = glow },
+            FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+
         val content = LinearLayout(c).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(Ui.dp(c, 56), Ui.dp(c, 32), Ui.dp(c, 56), Ui.dp(c, 32))
+            setPadding(Ui.dp(c, 56), Ui.dp(c, 36), Ui.dp(c, 56), Ui.dp(c, 30))
             clipChildren = false
+            clipToPadding = false
         }
 
-        // En-tête : heure + date à gauche, météo à droite
-        val header = LinearLayout(c).apply {
+        // Haut : salutation, grande heure fine, date | pilule météo
+        val top = LinearLayout(c).apply {
             orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
+            gravity = Gravity.TOP
         }
         val left = LinearLayout(c).apply { orientation = LinearLayout.VERTICAL }
-        clock = Ui.text(c, "--:--", 64f, bold = true)
-        date = Ui.text(c, "", 20f, Ui.MUTED)
-        left.addView(clock)
-        left.addView(date)
-        header.addView(left, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-        weather = Ui.text(c, "", 28f).apply { gravity = Gravity.END }
-        header.addView(weather)
-        content.addView(header)
+        greet = Ui.text(c, "", 20f, Ui.MUTED, Ui.LIGHT)
+        clock = Ui.text(c, "--:--", 84f, Color.WHITE, Ui.THIN).apply { setPadding(0, Ui.dp(c, 4), 0, Ui.dp(c, 4)) }
+        date = Ui.text(c, "", 20f, Color.WHITE, Ui.LIGHT)
+        left.addView(greet); left.addView(clock); left.addView(date)
+        top.addView(left, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        weather = Ui.pill(c, "")
+        top.addView(weather)
+        content.addView(top)
 
-        content.addView(Ui.section(c, "Favoris"))
-        val (favBox, fr) = Ui.hrow(c)
-        favRow = fr
-        content.addView(favBox)
+        // Milieu : maison
+        content.addView(View(c), LinearLayout.LayoutParams(1, 0, 1f))
+        homeTitle = Ui.section(c, "Maison")
+        content.addView(homeTitle)
+        val (hb, hr) = Ui.hrow(c, padV = 16)
+        homeBox = hb; homeRow = hr
+        content.addView(homeBox)
 
-        tilesTitle = Ui.section(c, "Maison")
-        content.addView(tilesTitle)
-        val (tb, tr) = Ui.hrow(c)
-        tilesBox = tb
-        tilesRow = tr
-        content.addView(tilesBox)
+        // Bas : nom de l'appli sélectionnée + dock
+        focusName = Ui.text(c, "", 38f, Color.WHITE, Ui.LIGHT).apply {
+            setPadding(Ui.dp(c, 8), Ui.dp(c, 10), 0, Ui.dp(c, 6))
+            setShadowLayer(Ui.dp(c, 18).toFloat(), 0f, 0f, Color.argb(0x99, 0x3A, 0x6F, 0xF7))
+        }
+        content.addView(focusName)
 
-        val scroll = ScrollView(c).apply {
-            isVerticalScrollBarEnabled = false
+        val band = FrameLayout(c).apply {
+            background = GradientDrawable().apply {
+                cornerRadius = Ui.dp(c, 28).toFloat()
+                setColor(Ui.BAND)
+            }
             clipChildren = false
-            addView(content)
+            clipToPadding = false
         }
-        val root = FrameLayout(c).apply {
-            background = Ui.background()
-            addView(scroll)
-        }
+        val (db, dr) = Ui.hrow(c, padV = 22)
+        dockRow = dr
+        band.addView(db)
+        content.addView(band, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+
+        root.addView(content, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
         setContentView(root)
+    }
+
+    private fun onDockFocus(key: String, name: String, banner: android.graphics.drawable.Drawable?, color: Int?) = { has: Boolean ->
+        if (has) {
+            lastKey = key
+            focusName.text = name
+            val col = color ?: Ui.dominantColor(banner)
+            glow.colors = intArrayOf(Color.argb(0x66, Color.red(col), Color.green(col), Color.blue(col)), Color.TRANSPARENT)
+            focusName.setShadowLayer(Ui.dp(this, 22).toFloat(), 0f, 0f, Color.argb(0xCC, Color.red(col), Color.green(col), Color.blue(col)))
+        }
     }
 
     private fun populate() {
         val c = this
-        favRow.removeAllViews()
-        favRow.addView(Ui.labelCard(c, "📺  TV en direct", 300, 170, Ui.ACCENT) {
+        dockRow.removeAllViews()
+
+        val tvColor = Color.parseColor("#3A6FF7")
+        dockRow.addView(Ui.glyphCard(c, "📺", "TV en direct", 240, 135, tvColor, "live",
+            onDockFocus("live", "TV en direct", null, tvColor)) {
             if (!Ui.launch(c, cfg.liveTvPackage)) toast("Impossible d'ouvrir ${cfg.liveTvPackage}")
         })
         for (pkg in cfg.favorites) {
-            Ui.appCard(c, pkg)?.let { favRow.addView(it) }
+            val name = Ui.label(c, pkg) ?: continue
+            val b = Ui.banner(c, pkg) ?: Ui.icon(c, pkg)
+            Ui.appCard(c, pkg, onFocus = onDockFocus(pkg, name, b, null))?.let { dockRow.addView(it) }
         }
-        favRow.addView(Ui.labelCard(c, "⋯  Toutes les applis", 300, 170, Ui.CARD) {
+        val gray = Color.parseColor("#48484A")
+        dockRow.addView(Ui.glyphCard(c, "▦", "Toutes les applis", 240, 135, Ui.TILE, "all",
+            onDockFocus("all", "Toutes les applis", null, gray)) {
             startActivity(Intent(c, AppsActivity::class.java))
         })
 
-        tilesRow.removeAllViews()
+        homeRow.removeAllViews()
         tileViews.clear()
-        val show = cfg.tiles.isNotEmpty()
-        tilesTitle.visibility = if (show) android.view.View.VISIBLE else android.view.View.GONE
-        tilesBox.visibility = tilesTitle.visibility
+        camViews.clear()
+        val hide = cfg.tiles.isEmpty()
+        Ui.gone(homeTitle, hide); Ui.gone(homeBox, hide)
         for (t in cfg.tiles) {
-            val state = Ui.text(c, "…", 26f, bold = true)
-            val card = Ui.card(c, 230, 130) { onTile(t) }
-            val col = LinearLayout(c).apply {
-                orientation = LinearLayout.VERTICAL
-                gravity = Gravity.CENTER_VERTICAL
-                setPadding(Ui.dp(c, 20), 0, Ui.dp(c, 20), 0)
-                addView(Ui.text(c, t.name, 17f, Ui.MUTED))
-                addView(state)
-            }
-            card.addView(col, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
-            tilesRow.addView(card)
-            tileViews[t.entity] = TileView(card, state)
+            if (t.entity.startsWith("camera.")) homeRow.addView(cameraTile(t)) else homeRow.addView(stateTile(t))
         }
 
-        if (favRow.childCount > 0 && currentFocus == null) favRow.getChildAt(0).requestFocus()
+        val target = lastKey?.let { root.findViewWithTag<View>(it) } ?: dockRow.getChildAt(0)
+        target?.requestFocus()
+    }
+
+    private fun homeFocus(key: String, name: String) = { has: Boolean ->
+        if (has) {
+            lastKey = key
+            focusName.text = name
+            glow.colors = intArrayOf(Color.argb(0x40, 0xFF, 0xD6, 0x0A), Color.TRANSPARENT)
+            focusName.setShadowLayer(Ui.dp(this, 22).toFloat(), 0f, 0f, Color.argb(0x99, 0xFF, 0xD6, 0x0A))
+        }
+    }
+
+    private fun stateTile(t: Tile): View {
+        val c = this
+        val glyph = when (t.entity.substringBefore('.')) {
+            "light" -> "💡"; "switch" -> "🔌"; "vacuum" -> "🧹"; "input_boolean" -> "🌙"
+            else -> if (t.entity.contains("energ")) "🔋" else if (t.entity.contains("puissance") || t.entity.contains("power")) "⚡" else "📈"
+        }
+        val state = Ui.text(c, "…", 24f, Color.WHITE, Ui.LIGHT)
+        val card = Ui.card(c, 200, 150, Ui.TILE, t.entity, homeFocus(t.entity, t.name)) { onTile(t) }
+        card.addView(LinearLayout(c).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(Ui.dp(c, 18), Ui.dp(c, 16), Ui.dp(c, 18), Ui.dp(c, 16))
+            addView(Ui.text(c, glyph, 24f))
+            addView(View(c), LinearLayout.LayoutParams(1, 0, 1f))
+            addView(Ui.text(c, t.name, 15f, Ui.MUTED, Ui.MEDIUM))
+            addView(state)
+        }, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        tileViews[t.entity] = TileView(card, state)
+        return card
+    }
+
+    private fun cameraTile(t: Tile): View {
+        val c = this
+        val card = Ui.card(c, 267, 150, Ui.TILE, t.entity, homeFocus(t.entity, t.name)) {
+            startActivity(Intent(c, CameraActivity::class.java)
+                .putExtra("entity", t.entity).putExtra("name", t.name))
+        }
+        val img = ImageView(c).apply { scaleType = ImageView.ScaleType.CENTER_CROP }
+        card.addView(img, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        card.addView(View(c).apply {
+            background = GradientDrawable(GradientDrawable.Orientation.BOTTOM_TOP,
+                intArrayOf(Color.argb(0xC0, 0, 0, 0), Color.TRANSPARENT))
+        }, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, Ui.dp(c, 60), Gravity.BOTTOM))
+        card.addView(Ui.text(c, "🔔  ${t.name}", 15f, Color.WHITE, Ui.MEDIUM).apply {
+            setPadding(Ui.dp(c, 14), 0, 0, Ui.dp(c, 12))
+        }, FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM))
+        camViews[t.entity] = img
+        return card
     }
 
     private fun onTile(t: Tile) {
@@ -181,22 +274,26 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun refreshHa() {
+    private fun refreshHa(withCameras: Boolean) {
         val h = ha
         if (h == null) {
-            weather.text = if (cfg.haUrl.isBlank()) "" else "HA : token manquant"
+            weather.text = if (cfg.haUrl.isBlank()) "Configurer Home Assistant" else "HA : token manquant"
             return
         }
         val weatherEntity = cfg.weatherEntity
-        val entities = cfg.tiles.map { it.entity }
+        val entities = tileViews.keys.toList()
+        val cams = if (withCameras) camViews.keys.toList() else emptyList()
         thread {
             val w = if (weatherEntity.isNotBlank()) h.state(weatherEntity) else null
             val states = entities.associateWith { h.state(it) }
+            val shots = cams.associateWith { h.snapshot(it) }
             runOnUiThread {
+                Ui.gone(weather, weatherEntity.isBlank())
                 if (weatherEntity.isNotBlank()) weather.text = w?.let { formatWeather(it) } ?: "Météo indispo"
                 states.forEach { (e, s) ->
                     if (s != null) applyTile(e, s) else tileViews[e]?.state?.text = "Hors ligne"
                 }
+                shots.forEach { (e, bmp) -> if (bmp != null) camViews[e]?.setImageBitmap(bmp) }
             }
         }
     }
@@ -205,28 +302,38 @@ class MainActivity : Activity() {
         val tv = tileViews[entity] ?: return
         val st = js.optString("state")
         val unit = js.optJSONObject("attributes")?.optString("unit_of_measurement", "") ?: ""
-        val on = st == "on" || st == "open" || st == "playing"
-        tv.state.text = when (st) {
-            "on" -> "Allumé"
-            "off" -> "Éteint"
-            "open" -> "Ouvert"
-            "closed" -> "Fermé"
-            "unavailable" -> "Indispo"
-            "unknown" -> "?"
-            else -> {
-                val n = st.toDoubleOrNull()
-                val v = if (n != null && st.contains('.')) String.format(Locale.FRANCE, "%.1f", n) else st
-                if (unit.isNotEmpty()) "$v $unit" else v
-            }
+        val on = st == "on" || st == "open" || st == "playing" || st == "cleaning"
+        tv.state.text = formatState(st, unit)
+        (tv.card.background as? GradientDrawable)?.setColor(if (on) Ui.TILE_ON else Ui.TILE)
+        tv.state.setTextColor(if (on) Ui.ON else Color.WHITE)
+    }
+
+    private fun formatState(st: String, unit: String): String {
+        when (st) {
+            "on" -> return "Allumé"
+            "off" -> return "Éteint"
+            "open" -> return "Ouvert"
+            "closed" -> return "Fermé"
+            "cleaning" -> return "Nettoie"
+            "docked" -> return "À la base"
+            "unavailable" -> return "Indispo"
+            "unknown" -> return "—"
         }
-        (tv.card.background as? android.graphics.drawable.GradientDrawable)
-            ?.setColor(if (on) Ui.CARD_ON else Ui.CARD)
+        val n = st.toDoubleOrNull() ?: return if (unit.isNotEmpty()) "$st $unit" else st
+        if (unit == "W" && n >= 1000) return String.format(Locale.FRANCE, "%.2f kW", n / 1000)
+        val v = when {
+            kotlin.math.abs(n) >= 100 -> String.format(Locale.FRANCE, "%.0f", n)
+            st.contains('.') -> String.format(Locale.FRANCE, "%.1f", n)
+            else -> st
+        }
+        return if (unit.isNotEmpty()) "$v $unit" else v
     }
 
     private fun formatWeather(js: JSONObject): String {
         val cond = js.optString("state")
         val a = js.optJSONObject("attributes")
-        val temp = a?.opt("temperature")?.toString() ?: "?"
+        val t = a?.optDouble("temperature")
+        val temp = if (t == null || t.isNaN()) "?" else String.format(Locale.FRANCE, "%.0f", t)
         val unit = a?.optString("temperature_unit", "°C") ?: "°C"
         val (emoji, fr) = when (cond) {
             "sunny" -> "☀️" to "Ensoleillé"
@@ -242,7 +349,7 @@ class MainActivity : Activity() {
             "hail" -> "🌨️" to "Grêle"
             else -> "" to cond
         }
-        return "$emoji $temp $unit\n$fr"
+        return "$emoji  $temp$unit · $fr"
     }
 
     private fun toast(s: String) = Toast.makeText(this, s, Toast.LENGTH_SHORT).show()

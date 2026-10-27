@@ -171,7 +171,7 @@ class BridgeService : Service() {
                     "/notify" -> {
                         val b = JSONObject(r.body.ifBlank { "{}" })
                         Notifier.show(ctx, b.optString("title", "Home Assistant"),
-                            b.optString("message", ""), b.optInt("duration", 8))
+                            b.optString("message", ""), b.optInt("duration", 8), b.optString("camera", ""))
                         ok
                     }
                     "/launch" -> {
