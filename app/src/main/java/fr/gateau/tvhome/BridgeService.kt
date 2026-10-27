@@ -108,6 +108,10 @@ class BridgeService : Service() {
             .put("app", pkg ?: "inconnu")
             .put("app_name", pkg?.let { Ui.label(this, it) } ?: "inconnu")
             .put("usage_access", AppTracker.hasUsageAccess(this))
+            .put("ram_pct", SysInfo.ram(this).first)
+            .put("ram_free_mb", SysInfo.ram(this).second)
+            .put("temp_c", SysInfo.tempC() ?: JSONObject.NULL)
+            .put("uptime_min", SysInfo.uptimeMs() / 60_000)
             .put("version", 1)
     }
 

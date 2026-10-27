@@ -43,6 +43,11 @@ class MainActivity : Activity() {
     private lateinit var weatherPill: View
     private lateinit var weatherIcon: TextView
     private lateinit var weatherText: TextView
+    private lateinit var ramText: TextView
+    private lateinit var ramIcon: TextView
+    private lateinit var tempText: TextView
+    private lateinit var tempPill: View
+    private lateinit var upText: TextView
     private lateinit var homeBox: View
     private lateinit var homeRow: LinearLayout
     private lateinit var focusName: TextView
@@ -70,6 +75,20 @@ class MainActivity : Activity() {
     private lateinit var saverWeatherIcon: TextView
     private val idle = Runnable { showSaver() }
 
+    private var statTick = 0
+
+    private fun setIfChanged(v: TextView, s: String) { if (v.text.toString() != s) v.text = s }
+
+    private fun refreshStats() {
+        val (pct, freeMb) = SysInfo.ram(this)
+        setIfChanged(ramText, "RAM $pct %")
+        ramIcon.setTextColor(when { pct >= 90 -> Color.parseColor("#FF453A"); pct >= 80 -> Color.parseColor("#FF9F0A"); else -> Color.WHITE })
+        val t = SysInfo.tempC()
+        Ui.gone(tempPill, t == null)
+        if (t != null) setIfChanged(tempText, String.format(Locale.FRANCE, "%.0f °C", t))
+        setIfChanged(upText, SysInfo.uptimeText())
+    }
+
     private val clockFmt = SimpleDateFormat("HH:mm", Locale.FRANCE)
     private val dateFmt = SimpleDateFormat("EEEE d MMMM", Locale.FRANCE)
 
@@ -78,11 +97,12 @@ class MainActivity : Activity() {
             val now = Date()
             val t = clockFmt.format(now)
             val d = dateFmt.format(now).replaceFirstChar { it.uppercase() }
-            clock.text = t
-            date.text = d
+            setIfChanged(clock, t)
+            setIfChanged(date, d)
             val h = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
-            greet.text = when (h) { in 5..11 -> "Bonjour"; in 12..17 -> "Bon après-midi"; else -> "Bonsoir" }
-            if (saver != null) { saverClock.text = t; saverDate.text = d }
+            setIfChanged(greet, when (h) { in 5..11 -> "Bonjour"; in 12..17 -> "Bon après-midi"; else -> "Bonsoir" })
+            if (saver != null) { setIfChanged(saverClock, t); setIfChanged(saverDate, d) }
+            if (statTick++ % 10 == 0 && saver == null) refreshStats()
             ui.postDelayed(this, 1000)
         }
     }
@@ -108,6 +128,7 @@ class MainActivity : Activity() {
         populate()
         loadWallpaper()
         camCounter = 0
+        statTick = 0
         ui.post(clockTick)
         ui.post(haTick)
         resetIdle()
@@ -207,7 +228,29 @@ class MainActivity : Activity() {
         pills.addView(sp, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
             marginStart = Ui.dp(c, 12)
         })
-        top.addView(pills)
+        val right = LinearLayout(c).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.END }
+        right.addView(pills)
+        val stats = LinearLayout(c).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL or Gravity.END
+            setPadding(0, Ui.dp(c, 12), 0, 0)
+        }
+        fun stat(icon: String): Triple<LinearLayout, TextView, TextView> {
+            val t = Ui.iconPill(c, icon, "")
+            t.first.setPadding(Ui.dp(c, 12), Ui.dp(c, 6), Ui.dp(c, 14), Ui.dp(c, 6))
+            t.second.textSize = 15f
+            t.third.textSize = 14f
+            t.third.setTextColor(Color.argb(0xD0, 0xFF, 0xFF, 0xFF))
+            stats.addView(t.first, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                marginStart = Ui.dp(c, 8)
+            })
+            return t
+        }
+        stat("memory").let { ramIcon = it.second; ramText = it.third }
+        stat("thermometer").let { tempPill = it.first; tempText = it.third }
+        stat("power").let { upText = it.third }
+        right.addView(stats)
+        top.addView(right)
         content.addView(top)
 
         // Milieu : maison
