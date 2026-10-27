@@ -5,7 +5,16 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 
-data class Tile(val entity: String, val name: String)
+data class Tile(
+    val entity: String,
+    val name: String,
+    val onText: String = "",
+    val offText: String = "",
+    val icon: String = "",
+    val onColor: String = "",
+    /** Tuile « tous allumés » : on si toutes ces entités sont à on. */
+    val allOn: List<String> = emptyList(),
+)
 
 data class Config(
     val haUrl: String,
@@ -50,8 +59,11 @@ object ConfigStore {
         val tiles = j.optJSONArray("tiles")?.let { arr ->
             (0 until arr.length()).map {
                 val o = arr.getJSONObject(it)
-                val e = o.getString("entity")
-                Tile(e, o.optString("name", e))
+                val all = strings(o.optJSONArray("all_on")) ?: emptyList()
+                val name = o.optString("name", "")
+                val e = o.optString("entity", "").ifBlank { "multi." + name.lowercase().replace(Regex("[^a-z0-9]+"), "_") }
+                Tile(e, name.ifBlank { e }, o.optString("on_text", ""), o.optString("off_text", ""),
+                    o.optString("icon", ""), o.optString("on_color", ""), all)
             }
         } ?: emptyList()
         return Config(

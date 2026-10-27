@@ -18,7 +18,7 @@ class HaClient(base: String, private val token: String) {
         private val JSON_TYPE = "application/json; charset=utf-8".toMediaType()
 
         private val READ_ONLY = setOf(
-            "sensor", "binary_sensor", "weather", "person", "device_tracker", "sun", "zone", "image", "camera"
+            "sensor", "binary_sensor", "weather", "person", "device_tracker", "sun", "zone", "image", "camera", "multi"
         )
 
         fun isActionable(entity: String) = entity.substringBefore('.') !in READ_ONLY && !entity.startsWith("camera.")

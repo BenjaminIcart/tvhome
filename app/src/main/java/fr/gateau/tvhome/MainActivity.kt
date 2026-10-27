@@ -51,7 +51,7 @@ class MainActivity : Activity() {
     private lateinit var wallpaper: ImageView
     private lateinit var scrim: View
 
-    private class TileView(val card: FrameLayout, val badge: TextView, val state: TextView)
+    private class TileView(val tile: Tile, val card: FrameLayout, val badge: TextView, val state: TextView)
     private val tileViews = mutableMapOf<String, TileView>()
     private val camViews = mutableMapOf<String, ImageView>()
     private var lastKey: String? = null
@@ -389,7 +389,7 @@ class MainActivity : Activity() {
 
     private fun stateTile(t: Tile): View {
         val c = this
-        val badge = Ui.iconBadge(c, Icons.forEntity(t.entity), 34, 19f, Color.argb(0x26, 0xFF, 0xFF, 0xFF), Color.WHITE)
+        val badge = Ui.iconBadge(c, t.icon.ifBlank { Icons.forEntity(t.entity) }, 34, 19f, Color.argb(0x26, 0xFF, 0xFF, 0xFF), Color.WHITE)
         val state = Ui.text(c, "…", 21f, Color.WHITE, Ui.SEMIBOLD)
         val card = Ui.card(c, 156, 104, Color.TRANSPARENT, t.entity, homeFocus(t.entity, t.name)) { onTile(t) }
         card.background = Ui.glassBg(c)
@@ -401,7 +401,7 @@ class MainActivity : Activity() {
             addView(Ui.text(c, t.name, 13f, Color.argb(0xA6, 0xFF, 0xFF, 0xFF), Ui.MEDIUM))
             addView(state)
         }, matchParent())
-        tileViews[t.entity] = TileView(card, badge, state)
+        tileViews[t.entity] = TileView(t, card, badge, state)
         return card
     }
 
@@ -461,7 +461,8 @@ class MainActivity : Activity() {
             return
         }
         val weatherEntity = cfg.weatherEntity
-        val entities = tileViews.keys.toList()
+        val entities = tileViews.values.flatMap { if (it.tile.allOn.isNotEmpty()) it.tile.allOn else listOf(it.tile.entity) }.distinct()
+        val groups = tileViews.values.filter { it.tile.allOn.isNotEmpty() }.map { it.tile }
         val cams = if (withCameras) camViews.keys.toList() else emptyList()
         thread {
             val w = if (weatherEntity.isNotBlank()) h.state(weatherEntity) else null
@@ -475,7 +476,16 @@ class MainActivity : Activity() {
                     Icons.set(weatherIcon, wf.first)
                     weatherText.text = wf.second
                 } else if (weatherEntity.isNotBlank()) weatherText.text = "Météo indispo"
-                states.forEach { (e, s) -> if (s != null) applyTile(e, s) else tileViews[e]?.state?.text = "Hors ligne" }
+                states.forEach { (e, s) ->
+                    if (!tileViews.containsKey(e)) return@forEach
+                    if (s != null) applyTile(e, s) else tileViews[e]?.state?.text = "Hors ligne"
+                }
+                for (g in groups) {
+                    val parts = g.allOn.map { states[it] }
+                    if (parts.any { it == null }) { tileViews[g.entity]?.state?.text = "Hors ligne"; continue }
+                    val allOn = parts.all { it!!.optString("state") == "on" }
+                    applyTile(g.entity, JSONObject().put("state", if (allOn) "on" else "off"))
+                }
                 shots.forEach { (e, bmp) -> if (bmp != null) camViews[e]?.setImageBitmap(bmp) }
             }
         }
@@ -486,15 +496,22 @@ class MainActivity : Activity() {
         val st = js.optString("state")
         val attrs = js.optJSONObject("attributes")
         val unit = attrs?.optString("unit_of_measurement", "") ?: ""
+        val t = tv.tile
         val on = st == "on" || st == "open" || st == "opening" || st == "playing" || st == "cleaning"
-        tv.state.text = formatState(st, unit)
-        tv.state.setTextColor(if (on) Ui.ON else Color.WHITE)
-        val icon = attrs?.optString("icon", "")?.takeIf { it.startsWith("mdi:") } ?: Icons.forEntity(entity, st)
+        val accent = try { if (t.onColor.isNotBlank()) Color.parseColor(t.onColor) else Ui.ON } catch (e: Exception) { Ui.ON }
+        tv.state.text = when {
+            on && t.onText.isNotBlank() -> t.onText
+            !on && t.offText.isNotBlank() && (st == "off" || st == "closed") -> t.offText
+            else -> formatState(st, unit)
+        }
+        tv.state.setTextColor(if (on) accent else Color.WHITE)
+        val icon = t.icon.ifBlank { attrs?.optString("icon", "")?.takeIf { it.startsWith("mdi:") } ?: Icons.forEntity(entity, st) }
         Icons.set(tv.badge, icon)
-        (tv.badge.background as? GradientDrawable)?.setColor(if (on) Ui.ON else Color.argb(0x26, 0xFF, 0xFF, 0xFF))
+        (tv.badge.background as? GradientDrawable)?.setColor(if (on) accent else Color.argb(0x26, 0xFF, 0xFF, 0xFF))
         tv.badge.setTextColor(if (on) Color.BLACK else Color.WHITE)
-        tv.card.background = if (on) Ui.glassBg(this, alpha = 0x26).apply { setStroke(Ui.dp(this@MainActivity, 1), Color.argb(0x66, 0xFF, 0xD6, 0x0A)) }
-        else Ui.glassBg(this)
+        tv.card.background = if (on) Ui.glassBg(this, alpha = 0x26).apply {
+            setStroke(Ui.dp(this@MainActivity, 1), Color.argb(0x88, Color.red(accent), Color.green(accent), Color.blue(accent)))
+        } else Ui.glassBg(this)
     }
 
     private fun formatState(st: String, unit: String): String {
