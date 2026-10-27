@@ -71,7 +71,10 @@ fun HaClient.snapshot(entity: String): android.graphics.Bitmap? = try {
         .build()
     HaClient.httpClient().newCall(req).execute().use { r ->
         if (!r.isSuccessful) null
-        else r.body?.byteStream()?.let { android.graphics.BitmapFactory.decodeStream(it) }
+        else r.body?.bytes()?.let { b ->
+            val o = android.graphics.BitmapFactory.Options().apply { inSampleSize = 2; inPreferredConfig = android.graphics.Bitmap.Config.RGB_565 }
+            android.graphics.BitmapFactory.decodeByteArray(b, 0, b.size, o)
+        }
     }
 } catch (e: Exception) {
     null

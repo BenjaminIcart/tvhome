@@ -11,8 +11,8 @@ android {
         applicationId = "fr.gateau.tvhome"
         minSdk = 24
         targetSdk = 30
-        versionCode = 9
-        versionName = "3.2"
+        versionCode = 10
+        versionName = "3.3"
     }
 
     signingConfigs {

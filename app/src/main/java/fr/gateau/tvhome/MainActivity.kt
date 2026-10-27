@@ -90,7 +90,7 @@ class MainActivity : Activity() {
         override fun run() {
             refreshHa(withCameras = camCounter % 2 == 0)
             camCounter++
-            ui.postDelayed(this, 10_000)
+            ui.postDelayed(this, 15_000)
         }
     }
 
@@ -178,7 +178,7 @@ class MainActivity : Activity() {
             setGradientCenter(0.3f, 1.0f)
             colors = intArrayOf(Color.argb(0x55, 0x0A, 0x84, 0xFF), Color.TRANSPARENT)
         }
-        root.addView(View(c).apply { background = glow }, matchParent())
+        root.addView(View(c).apply { background = glow; setLayerType(View.LAYER_TYPE_HARDWARE, null) }, matchParent())
 
         val content = LinearLayout(c).apply {
             orientation = LinearLayout.VERTICAL
@@ -257,16 +257,6 @@ class MainActivity : Activity() {
             leftMargin = Ui.dp(c, offX); rightMargin = Ui.dp(c, offX)
             topMargin = Ui.dp(c, offY); bottomMargin = Ui.dp(c, -sizeDp / 3)
         })
-        ObjectAnimator.ofPropertyValuesHolder(v,
-            PropertyValuesHolder.ofFloat("translationX", 0f, Ui.dp(c, dx.toInt()).toFloat()),
-            PropertyValuesHolder.ofFloat("translationY", 0f, Ui.dp(c, dy.toInt()).toFloat()),
-        ).apply {
-            duration = period
-            repeatMode = ValueAnimator.REVERSE
-            repeatCount = ValueAnimator.INFINITE
-            interpolator = AccelerateDecelerateInterpolator()
-            start()
-        }
     }
 
     private fun loadWallpaper() {
@@ -370,9 +360,6 @@ class MainActivity : Activity() {
         }
         card.addView(badge, FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT,
             Gravity.TOP or Gravity.START).apply { leftMargin = Ui.dp(c, 10); topMargin = Ui.dp(c, 10) })
-        ObjectAnimator.ofFloat(dot, "alpha", 1f, 0.25f).apply {
-            duration = 900; repeatMode = ValueAnimator.REVERSE; repeatCount = ValueAnimator.INFINITE; start()
-        }
         card.addView(Icons.view(c, "television-play", 26f, Color.WHITE), FrameLayout.LayoutParams(
             ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.TOP or Gravity.END
         ).apply { rightMargin = Ui.dp(c, 12); topMargin = Ui.dp(c, 9) })
