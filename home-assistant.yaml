@@ -1,0 +1,37 @@
+# À coller dans configuration.yaml (puis redémarrer HA)
+
+# 1) Envoyer une notif / lancer une appli sur la TV
+rest_command:
+  tv_notify:
+    url: "http://192.168.1.190:8765/notify"
+    method: POST
+    content_type: "application/json; charset=utf-8"
+    payload: '{"title": {{ title | tojson }}, "message": {{ message | default("") | tojson }}, "duration": {{ duration | default(8) }}}'
+  tv_launch:
+    url: "http://192.168.1.190:8765/launch"
+    method: POST
+    content_type: "application/json; charset=utf-8"
+    payload: '{"package": {{ package | tojson }}}'
+
+# 2) État de la TV remonté dans HA
+rest:
+  - resource: "http://192.168.1.190:8765/state"
+    scan_interval: 10
+    sensor:
+      - name: "Bbox appli en cours"
+        unique_id: bbox_app_en_cours
+        value_template: "{{ value_json.app_name }}"
+        json_attributes:
+          - app
+          - usage_access
+    binary_sensor:
+      - name: "Bbox écran allumé"
+        unique_id: bbox_ecran_allume
+        value_template: "{{ value_json.screen_on }}"
+
+# Exemple d'automatisation :
+# action: rest_command.tv_notify
+# data:
+#   title: "🔔 Sonnette"
+#   message: "Quelqu'un est à la porte"
+#   duration: 10

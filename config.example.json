@@ -1,0 +1,21 @@
+{
+  "ha_url": "http://192.168.1.XX:8123",
+  "ha_token": "COLLE_ICI_TON_TOKEN_LONGUE_DUREE",
+  "weather_entity": "weather.forecast_maison",
+  "live_tv_package": "fr.bouyguestelecom.tv.bbui",
+  "favorites": [
+    "com.netflix.ninja",
+    "com.google.android.youtube.tv",
+    "com.disney.disneyplus",
+    "fr.tf1.mytf1",
+    "fr.m6.m6replay.by",
+    "com.spotify.tv.android"
+  ],
+  "tiles": [
+    { "entity": "light.neon_bureau", "name": "Néon bureau" },
+    { "entity": "light.wled_bureau", "name": "WLED" },
+    { "entity": "sensor.puissance_maison", "name": "Conso" }
+  ],
+  "server_port": 8765,
+  "server_key": ""
+}
