@@ -28,6 +28,7 @@ class BridgeService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        Ui.init(this)
         startForeground(1, buildNotification())
     }
 

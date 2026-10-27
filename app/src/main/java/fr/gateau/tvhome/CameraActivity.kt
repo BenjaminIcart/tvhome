@@ -38,6 +38,7 @@ class CameraActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        Ui.init(this)
         entity = intent.getStringExtra("entity") ?: ""
         val cfg = ConfigStore.load(this)
         if (cfg.haUrl.isNotBlank() && cfg.haToken.isNotBlank()) ha = HaClient(cfg.haUrl, cfg.haToken)

@@ -10,6 +10,7 @@ import android.widget.ScrollView
 class AppsActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        Ui.init(this)
         val c = this
         val pm = packageManager
         val pkgs = linkedSetOf<String>()

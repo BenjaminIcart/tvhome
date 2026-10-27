@@ -27,9 +27,39 @@ object Ui {
     val GLASS = Color.argb(0x2E, 0xFF, 0xFF, 0xFF)
     val PILL = Color.argb(0x24, 0xFF, 0xFF, 0xFF)
 
-    val THIN: Typeface = Typeface.create("sans-serif-thin", Typeface.NORMAL)
-    val LIGHT: Typeface = Typeface.create("sans-serif-light", Typeface.NORMAL)
-    val MEDIUM: Typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+    var THIN: Typeface = Typeface.create("sans-serif-thin", Typeface.NORMAL)
+    var LIGHT: Typeface = Typeface.create("sans-serif-light", Typeface.NORMAL)
+    var REGULAR: Typeface = Typeface.DEFAULT
+    var MEDIUM: Typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+    var SEMIBOLD: Typeface = Typeface.DEFAULT_BOLD
+    private var ready = false
+
+    /** Charge la police Outfit et les icônes (à appeler avant de construire l'UI). */
+    fun init(c: Context) {
+        Icons.init(c)
+        if (ready) return
+        fun f(n: String, fb: Typeface) = try { Typeface.createFromAsset(c.assets, "fonts/Outfit_$n.ttf") } catch (e: Exception) { fb }
+        THIN = f("200ExtraLight", THIN)
+        LIGHT = f("300Light", LIGHT)
+        REGULAR = f("400Regular", REGULAR)
+        MEDIUM = f("500Medium", MEDIUM)
+        SEMIBOLD = f("600SemiBold", SEMIBOLD)
+        ready = true
+    }
+
+    /** Fond « verre » : blanc translucide + liseré fin. */
+    fun glassBg(c: Context, radiusDp: Int = 20, alpha: Int = 0x16): GradientDrawable = GradientDrawable().apply {
+        cornerRadius = dp(c, radiusDp).toFloat()
+        setColor(Color.argb(alpha, 0xFF, 0xFF, 0xFF))
+        setStroke(dp(c, 1), Color.argb(0x1F, 0xFF, 0xFF, 0xFF))
+    }
+
+    /** Pastille ronde contenant une icône (couleur unie). */
+    fun iconBadge(c: Context, icon: String, sizeDp: Int, iconSp: Float, bg: Int, fg: Int): android.widget.TextView =
+        Icons.view(c, icon, iconSp, fg).apply {
+            background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(bg) }
+            layoutParams = LinearLayout.LayoutParams(dp(c, sizeDp), dp(c, sizeDp))
+        }
 
     fun dp(c: Context, v: Int): Int = (v * c.resources.displayMetrics.density).toInt()
 
@@ -47,7 +77,7 @@ object Ui {
             setPadding(dp(c, 6), dp(c, 8), 0, 0)
         }
 
-    fun pill(c: Context, s: String): TextView = text(c, s, 18f, Color.WHITE, LIGHT).apply {
+    fun pill(c: Context, s: String): TextView = text(c, s, 18f, Color.WHITE, REGULAR).apply {
         setPadding(dp(c, 18), dp(c, 9), dp(c, 18), dp(c, 9))
         background = GradientDrawable().apply {
             cornerRadius = dp(c, 50).toFloat()
@@ -61,7 +91,7 @@ object Ui {
             cornerRadius = dp(c, 50).toFloat()
             setColor(PILL)
         }
-        return text(c, s, 18f, Color.WHITE, LIGHT).apply {
+        return text(c, s, 18f, Color.WHITE, REGULAR).apply {
             tag = key
             setPadding(dp(c, 18), dp(c, 9), dp(c, 18), dp(c, 9))
             background = bg
@@ -74,6 +104,41 @@ object Ui {
                 v.animate().scaleX(if (has) 1.08f else 1f).scaleY(if (has) 1.08f else 1f).setDuration(150).start()
             }
         }
+    }
+
+    /** Pilule icône + texte. Focusable si [onClick] est fourni. Renvoie (pilule, icône, texte). */
+    fun iconPill(c: Context, icon: String, s: String, key: String? = null, onClick: (() -> Unit)? = null):
+        Triple<LinearLayout, TextView, TextView> {
+        val bg = GradientDrawable().apply {
+            cornerRadius = dp(c, 50).toFloat()
+            setColor(PILL)
+            setStroke(dp(c, 1), Color.argb(0x1A, 0xFF, 0xFF, 0xFF))
+        }
+        val ic = Icons.view(c, icon, 20f, Color.WHITE)
+        val tx = text(c, s, 18f, Color.WHITE, REGULAR)
+        val pill = LinearLayout(c).apply {
+            tag = key
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(c, 16), dp(c, 10), dp(c, 18), dp(c, 10))
+            background = bg
+            addView(ic)
+            addView(tx, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                marginStart = dp(c, 10)
+            })
+            if (onClick != null) {
+                isFocusable = true
+                isClickable = true
+                setOnClickListener { onClick() }
+                setOnFocusChangeListener { v, has ->
+                    bg.setColor(if (has) Color.WHITE else PILL)
+                    ic.setTextColor(if (has) Color.BLACK else Color.WHITE)
+                    tx.setTextColor(if (has) Color.BLACK else Color.WHITE)
+                    v.animate().scaleX(if (has) 1.08f else 1f).scaleY(if (has) 1.08f else 1f).setDuration(150).start()
+                }
+            }
+        }
+        return Triple(pill, ic, tx)
     }
 
     fun hrow(c: Context, padV: Int = 18): Pair<HorizontalScrollView, LinearLayout> {
@@ -101,7 +166,7 @@ object Ui {
         c: Context, wDp: Int, hDp: Int, color: Int = TILE, key: String? = null,
         onFocus: ((Boolean) -> Unit)? = null, onClick: () -> Unit,
     ): FrameLayout {
-        val radius = dp(c, 16).toFloat()
+        val radius = dp(c, 20).toFloat()
         val glass = GradientDrawable(
             GradientDrawable.Orientation.TOP_BOTTOM,
             intArrayOf(Color.argb(0x40, 0xFF, 0xFF, 0xFF), Color.argb(0x0A, 0xFF, 0xFF, 0xFF))
@@ -231,14 +296,15 @@ object Ui {
     }
 
     fun glyphCard(
-        c: Context, glyph: String, title: String, wDp: Int, hDp: Int, color: Int, key: String,
+        c: Context, icon: String, title: String, wDp: Int, hDp: Int, key: String,
         onFocus: ((Boolean) -> Unit)? = null, onClick: () -> Unit,
-    ): FrameLayout = card(c, wDp, hDp, color, key, onFocus, onClick).apply {
+    ): FrameLayout = card(c, wDp, hDp, Color.TRANSPARENT, key, onFocus, onClick).apply {
+        background = glassBg(c)
         addView(LinearLayout(c).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
-            addView(text(c, glyph, 26f).apply { gravity = Gravity.CENTER })
-            addView(text(c, title, 13f, Color.WHITE, MEDIUM).apply {
+            addView(iconBadge(c, icon, 40, 22f, Color.argb(0x26, 0xFF, 0xFF, 0xFF), Color.WHITE))
+            addView(text(c, title, 14f, Color.WHITE, MEDIUM).apply {
                 gravity = Gravity.CENTER
                 setPadding(0, dp(c, 8), 0, 0)
             })
