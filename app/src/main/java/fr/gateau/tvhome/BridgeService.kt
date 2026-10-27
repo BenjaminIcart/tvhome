@@ -22,14 +22,42 @@ import kotlin.concurrent.thread
  *  POST /launch  {"package":"com.netflix.ninja"}
  *  POST /config  (contenu complet de config.json)
  */
+private val HOME_TOKEN = Any()
+
 class BridgeService : Service() {
     private var server: Bridge? = null
     private var port = 0
+
+    private val main = android.os.Handler(android.os.Looper.getMainLooper())
+
+    /** Au réveil (ou au démarrage), la Bbox ouvre sa TV en direct : on ramène notre accueil. */
+    private val screenOn = object : android.content.BroadcastReceiver() {
+        override fun onReceive(c: android.content.Context, i: Intent) { scheduleHome(3000) }
+    }
+
+    private fun scheduleHome(delay: Long) {
+        main.removeCallbacksAndMessages(HOME_TOKEN)
+        main.postAtTime({ goHomeIfBbox() }, HOME_TOKEN, android.os.SystemClock.uptimeMillis() + delay)
+    }
+
+    private fun goHomeIfBbox() {
+        val cfg = ConfigStore.load(this)
+        if (!cfg.powerOnHome) return
+        val live = cfg.liveTvPackage.substringBefore('/')
+        val fg = AppTracker.foreground(this)
+        if (fg == null || fg == live || fg == "com.android.tv.settings") {
+            try {
+                startActivity(Intent(this, MainActivity::class.java)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT))
+            } catch (e: Exception) {}
+        }
+    }
 
     override fun onCreate() {
         super.onCreate()
         Ui.init(this)
         startForeground(1, buildNotification())
+        registerReceiver(screenOn, android.content.IntentFilter(Intent.ACTION_SCREEN_ON))
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -43,10 +71,12 @@ class BridgeService : Service() {
             }
             port = wanted
         }
+        if (intent?.getBooleanExtra("boot", false) == true) scheduleHome(8000)
         return START_STICKY
     }
 
     override fun onDestroy() {
+        try { unregisterReceiver(screenOn) } catch (e: Exception) {}
         server?.stop()
         super.onDestroy()
     }

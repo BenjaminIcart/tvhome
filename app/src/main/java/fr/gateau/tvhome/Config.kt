@@ -26,6 +26,7 @@ data class Config(
     val serverPort: Int,
     val serverKey: String,
     val saverMinutes: Int,
+    val powerOnHome: Boolean,
 )
 
 object ConfigStore {
@@ -76,6 +77,7 @@ object ConfigStore {
             serverPort = j.optInt("server_port", 8765),
             serverKey = j.optString("server_key", ""),
             saverMinutes = j.optInt("screensaver_minutes", 5),
+            powerOnHome = j.optBoolean("power_on_home", true),
         )
     }
 }
