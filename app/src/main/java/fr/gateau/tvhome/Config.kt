@@ -27,6 +27,7 @@ data class Config(
     val serverKey: String,
     val saverMinutes: Int,
     val powerOnHome: Boolean,
+    val tempEntity: String,
 )
 
 object ConfigStore {
@@ -78,6 +79,7 @@ object ConfigStore {
             serverKey = j.optString("server_key", ""),
             saverMinutes = j.optInt("screensaver_minutes", 5),
             powerOnHome = j.optBoolean("power_on_home", true),
+            tempEntity = j.optString("temp_entity", ""),
         )
     }
 }

@@ -77,6 +77,7 @@ class MainActivity : Activity() {
     private val idle = Runnable { showSaver() }
 
     private var statTick = 0
+    private var haTemp: Double? = null
 
     private fun setIfChanged(v: TextView, s: String) { if (v.text.toString() != s) v.text = s }
 
@@ -84,7 +85,7 @@ class MainActivity : Activity() {
         val (pct, freeMb) = SysInfo.ram(this)
         setIfChanged(ramText, "RAM $pct %")
         ramIcon.setTextColor(when { pct >= 90 -> Color.parseColor("#FF453A"); pct >= 80 -> Color.parseColor("#FF9F0A"); else -> Color.WHITE })
-        val t = SysInfo.tempC()
+        val t = SysInfo.tempC() ?: haTemp
         val th = SysInfo.thermal(this)
         Ui.gone(tempPill, t == null && th == null)
         when {
@@ -512,6 +513,8 @@ class MainActivity : Activity() {
         val cams = if (withCameras) camViews.keys.toList() else emptyList()
         thread {
             val w = if (weatherEntity.isNotBlank()) h.state(weatherEntity) else null
+            val tempE = cfg.tempEntity
+            if (tempE.isNotBlank()) h.state(tempE)?.optString("state")?.toDoubleOrNull()?.let { haTemp = it }
             val states = entities.associateWith { h.state(it) }
             val shots = cams.associateWith { h.snapshot(it) }
             runOnUiThread {
