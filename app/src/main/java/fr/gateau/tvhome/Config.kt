@@ -16,6 +16,7 @@ data class Config(
     val tiles: List<Tile>,
     val serverPort: Int,
     val serverKey: String,
+    val saverMinutes: Int,
 )
 
 object ConfigStore {
@@ -62,6 +63,7 @@ object ConfigStore {
             tiles = tiles,
             serverPort = j.optInt("server_port", 8765),
             serverKey = j.optString("server_key", ""),
+            saverMinutes = j.optInt("screensaver_minutes", 5),
         )
     }
 }

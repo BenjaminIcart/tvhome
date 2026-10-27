@@ -44,6 +44,25 @@ class MainActivity : Activity() {
     private val tileViews = mutableMapOf<String, TileView>()
     private val camViews = mutableMapOf<String, ImageView>()
     private var lastKey: String? = null
+    private var saver: FrameLayout? = null
+    private lateinit var saverClock: TextView
+    private lateinit var saverDate: TextView
+    private val idle = Runnable { showSaver() }
+    private val saverMove = object : Runnable {
+        override fun run() {
+            val s = saver ?: return
+            val now = Date()
+            saverClock.text = clockFmt.format(now)
+            saverDate.text = dateFmt.format(now).replaceFirstChar { it.uppercase() }
+            val box = s.getChildAt(0)
+            val maxX = (s.width - box.width).coerceAtLeast(1)
+            val maxY = (s.height - box.height).coerceAtLeast(1)
+            // Déplacement lent toutes les 30 s pour éviter le marquage de l'écran
+            box.animate().x((Math.random() * maxX).toFloat()).y((Math.random() * maxY).toFloat())
+                .setDuration(3000).start()
+            ui.postDelayed(this, 30_000)
+        }
+    }
     private var camCounter = 0
 
     private val clockFmt = SimpleDateFormat("HH:mm", Locale.FRANCE)
@@ -81,12 +100,55 @@ class MainActivity : Activity() {
         camCounter = 0
         ui.post(clockTick)
         ui.post(haTick)
+        resetIdle()
     }
 
     override fun onPause() {
         super.onPause()
         ui.removeCallbacks(clockTick)
         ui.removeCallbacks(haTick)
+        ui.removeCallbacks(idle)
+        hideSaver()
+    }
+
+    override fun dispatchKeyEvent(event: android.view.KeyEvent): Boolean {
+        if (saver != null) {
+            // Une touche réveille l'accueil sans déclencher d'action
+            if (event.action == android.view.KeyEvent.ACTION_UP) { hideSaver(); resetIdle() }
+            return true
+        }
+        resetIdle()
+        return super.dispatchKeyEvent(event)
+    }
+
+    private fun resetIdle() {
+        ui.removeCallbacks(idle)
+        if (cfg.saverMinutes > 0) ui.postDelayed(idle, cfg.saverMinutes * 60_000L)
+    }
+
+    private fun showSaver() {
+        if (saver != null) return
+        val c = this
+        val s = FrameLayout(c).apply { setBackgroundColor(Color.BLACK); alpha = 0f }
+        val box = LinearLayout(c).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER_HORIZONTAL }
+        saverClock = Ui.text(c, "", 110f, Color.argb(0xD0, 0xFF, 0xFF, 0xFF), Ui.THIN)
+        saverDate = Ui.text(c, "", 22f, Color.argb(0x90, 0xFF, 0xFF, 0xFF), Ui.LIGHT)
+        box.addView(saverClock); box.addView(saverDate)
+        s.addView(box, FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.CENTER))
+        root.addView(s, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        saver = s
+        s.animate().alpha(1f).setDuration(1500).start()
+        ui.removeCallbacks(haTick)   // pas de requêtes HA pendant la veille
+        ui.post(saverMove)
+    }
+
+    private fun hideSaver() {
+        val s = saver ?: return
+        saver = null
+        ui.removeCallbacks(saverMove)
+        root.removeView(s)
+        ui.removeCallbacks(haTick)
+        ui.post(haTick)
     }
 
     @Deprecated("Launcher : Retour ne quitte pas l'accueil")
@@ -275,7 +337,7 @@ class MainActivity : Activity() {
     private fun stateTile(t: Tile): View {
         val c = this
         val glyph = when (t.entity.substringBefore('.')) {
-            "light" -> "💡"; "switch" -> "🔌"; "vacuum" -> "🧹"; "input_boolean" -> "🌙"
+            "light" -> "💡"; "switch" -> "🔌"; "vacuum" -> "🧹"; "input_boolean" -> "🌙"; "cover" -> "🚗"
             else -> if (t.entity.contains("energ")) "🔋" else if (t.entity.contains("puissance") || t.entity.contains("power")) "⚡" else "📈"
         }
         val state = Ui.text(c, "…", 20f, Color.WHITE, Ui.LIGHT)
@@ -311,9 +373,23 @@ class MainActivity : Activity() {
         return card
     }
 
+    private var armedEntity: String? = null
+    private var armedAt = 0L
+
     private fun onTile(t: Tile) {
         val h = ha ?: return toast("Home Assistant non configuré")
         if (!HaClient.isActionable(t.entity)) return
+        if (t.entity.startsWith("cover.")) {
+            val now = System.currentTimeMillis()
+            if (armedEntity != t.entity || now - armedAt > 3000) {
+                armedEntity = t.entity
+                armedAt = now
+                tileViews[t.entity]?.state?.text = "Encore OK ?"
+                tileViews[t.entity]?.state?.setTextColor(Color.parseColor("#FF9F0A"))
+                return
+            }
+            armedEntity = null
+        }
         thread {
             val ok = h.toggle(t.entity)
             Thread.sleep(400)
@@ -353,7 +429,7 @@ class MainActivity : Activity() {
         val tv = tileViews[entity] ?: return
         val st = js.optString("state")
         val unit = js.optJSONObject("attributes")?.optString("unit_of_measurement", "") ?: ""
-        val on = st == "on" || st == "open" || st == "playing" || st == "cleaning"
+        val on = st == "on" || st == "open" || st == "opening" || st == "playing" || st == "cleaning"
         tv.state.text = formatState(st, unit)
         (tv.card.background as? GradientDrawable)?.setColor(if (on) Ui.TILE_ON else Ui.TILE)
         tv.state.setTextColor(if (on) Ui.ON else Color.WHITE)
@@ -365,7 +441,9 @@ class MainActivity : Activity() {
             "off" -> return "Éteint"
             "open" -> return "Ouvert"
             "closed" -> return "Fermé"
-            "cleaning" -> return "Nettoie"
+                "cleaning" -> return "Nettoie"
+            "opening" -> return "Ouverture…"
+            "closing" -> return "Fermeture…"
             "docked" -> return "À la base"
             "unavailable" -> return "Indispo"
             "unknown" -> return "—"
