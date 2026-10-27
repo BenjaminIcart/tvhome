@@ -30,7 +30,7 @@ class AppsActivity : Activity() {
 
         var row: LinearLayout? = null
         sorted.forEachIndexed { i, (pkg, _) ->
-            if (i % 5 == 0) {
+            if (i % 6 == 0) {
                 row = LinearLayout(c).apply {
                     orientation = LinearLayout.HORIZONTAL
                     setPadding(Ui.dp(c, 12), Ui.dp(c, 14), Ui.dp(c, 12), Ui.dp(c, 14))
@@ -39,7 +39,7 @@ class AppsActivity : Activity() {
                 }
                 content.addView(row)
             }
-            Ui.appCard(c, pkg, 220, 124)?.let { row?.addView(it) }
+            Ui.appCard(c, pkg, 176, 99)?.let { row?.addView(it) }
         }
 
         val scroll = ScrollView(c).apply {

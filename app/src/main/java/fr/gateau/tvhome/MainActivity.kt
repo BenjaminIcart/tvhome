@@ -117,7 +117,7 @@ class MainActivity : Activity() {
 
         val content = LinearLayout(c).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(Ui.dp(c, 56), Ui.dp(c, 36), Ui.dp(c, 56), Ui.dp(c, 30))
+            setPadding(Ui.dp(c, 48), Ui.dp(c, 28), Ui.dp(c, 48), Ui.dp(c, 22))
             clipChildren = false
             clipToPadding = false
         }
@@ -128,9 +128,9 @@ class MainActivity : Activity() {
             gravity = Gravity.TOP
         }
         val left = LinearLayout(c).apply { orientation = LinearLayout.VERTICAL }
-        greet = Ui.text(c, "", 20f, Ui.MUTED, Ui.LIGHT)
-        clock = Ui.text(c, "--:--", 84f, Color.WHITE, Ui.THIN).apply { setPadding(0, Ui.dp(c, 4), 0, Ui.dp(c, 4)) }
-        date = Ui.text(c, "", 20f, Color.WHITE, Ui.LIGHT)
+        greet = Ui.text(c, "", 16f, Ui.MUTED, Ui.LIGHT)
+        clock = Ui.text(c, "--:--", 64f, Color.WHITE, Ui.THIN).apply { setPadding(0, Ui.dp(c, 4), 0, Ui.dp(c, 4)) }
+        date = Ui.text(c, "", 17f, Color.WHITE, Ui.LIGHT)
         left.addView(greet); left.addView(clock); left.addView(date)
         top.addView(left, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
         weather = Ui.pill(c, "")
@@ -141,12 +141,12 @@ class MainActivity : Activity() {
         content.addView(View(c), LinearLayout.LayoutParams(1, 0, 1f))
         homeTitle = Ui.section(c, "Maison")
         content.addView(homeTitle)
-        val (hb, hr) = Ui.hrow(c, padV = 16)
+        val (hb, hr) = Ui.hrow(c, padV = 12)
         homeBox = hb; homeRow = hr
         content.addView(homeBox)
 
         // Bas : nom de l'appli sélectionnée + dock
-        focusName = Ui.text(c, "", 38f, Color.WHITE, Ui.LIGHT).apply {
+        focusName = Ui.text(c, "", 28f, Color.WHITE, Ui.LIGHT).apply {
             setPadding(Ui.dp(c, 8), Ui.dp(c, 10), 0, Ui.dp(c, 6))
             setShadowLayer(Ui.dp(c, 18).toFloat(), 0f, 0f, Color.argb(0x99, 0x3A, 0x6F, 0xF7))
         }
@@ -160,7 +160,7 @@ class MainActivity : Activity() {
             clipChildren = false
             clipToPadding = false
         }
-        val (db, dr) = Ui.hrow(c, padV = 22)
+        val (db, dr) = Ui.hrow(c, padV = 16)
         dockRow = dr
         band.addView(db)
         content.addView(band, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
@@ -184,17 +184,17 @@ class MainActivity : Activity() {
         dockRow.removeAllViews()
 
         val tvColor = Color.parseColor("#3A6FF7")
-        dockRow.addView(Ui.glyphCard(c, "📺", "TV en direct", 240, 135, tvColor, "live",
+        dockRow.addView(Ui.glyphCard(c, "📺", "TV en direct", 176, 99, tvColor, "live",
             onDockFocus("live", "TV en direct", null, tvColor)) {
             if (!Ui.launch(c, cfg.liveTvPackage)) toast("Impossible d'ouvrir ${cfg.liveTvPackage}")
         })
         for (pkg in cfg.favorites) {
             val name = Ui.label(c, pkg) ?: continue
             val b = Ui.banner(c, pkg) ?: Ui.icon(c, pkg)
-            Ui.appCard(c, pkg, onFocus = onDockFocus(pkg, name, b, null))?.let { dockRow.addView(it) }
+            Ui.appCard(c, pkg, 176, 99, onFocus = onDockFocus(pkg, name, b, null))?.let { dockRow.addView(it) }
         }
         val gray = Color.parseColor("#48484A")
-        dockRow.addView(Ui.glyphCard(c, "▦", "Toutes les applis", 240, 135, Ui.TILE, "all",
+        dockRow.addView(Ui.glyphCard(c, "▦", "Toutes les applis", 176, 99, Ui.TILE, "all",
             onDockFocus("all", "Toutes les applis", null, gray)) {
             startActivity(Intent(c, AppsActivity::class.java))
         })
@@ -227,14 +227,14 @@ class MainActivity : Activity() {
             "light" -> "💡"; "switch" -> "🔌"; "vacuum" -> "🧹"; "input_boolean" -> "🌙"
             else -> if (t.entity.contains("energ")) "🔋" else if (t.entity.contains("puissance") || t.entity.contains("power")) "⚡" else "📈"
         }
-        val state = Ui.text(c, "…", 24f, Color.WHITE, Ui.LIGHT)
-        val card = Ui.card(c, 200, 150, Ui.TILE, t.entity, homeFocus(t.entity, t.name)) { onTile(t) }
+        val state = Ui.text(c, "…", 20f, Color.WHITE, Ui.LIGHT)
+        val card = Ui.card(c, 150, 104, Ui.TILE, t.entity, homeFocus(t.entity, t.name)) { onTile(t) }
         card.addView(LinearLayout(c).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(Ui.dp(c, 18), Ui.dp(c, 16), Ui.dp(c, 18), Ui.dp(c, 16))
-            addView(Ui.text(c, glyph, 24f))
+            setPadding(Ui.dp(c, 14), Ui.dp(c, 12), Ui.dp(c, 14), Ui.dp(c, 12))
+            addView(Ui.text(c, glyph, 20f))
             addView(View(c), LinearLayout.LayoutParams(1, 0, 1f))
-            addView(Ui.text(c, t.name, 15f, Ui.MUTED, Ui.MEDIUM))
+            addView(Ui.text(c, t.name, 13f, Ui.MUTED, Ui.MEDIUM))
             addView(state)
         }, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
         tileViews[t.entity] = TileView(card, state)
@@ -243,7 +243,7 @@ class MainActivity : Activity() {
 
     private fun cameraTile(t: Tile): View {
         val c = this
-        val card = Ui.card(c, 267, 150, Ui.TILE, t.entity, homeFocus(t.entity, t.name)) {
+        val card = Ui.card(c, 185, 104, Ui.TILE, t.entity, homeFocus(t.entity, t.name)) {
             startActivity(Intent(c, CameraActivity::class.java)
                 .putExtra("entity", t.entity).putExtra("name", t.name))
         }

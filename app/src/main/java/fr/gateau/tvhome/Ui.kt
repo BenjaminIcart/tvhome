@@ -90,7 +90,7 @@ object Ui {
         }
         return FrameLayout(c).apply {
             tag = key
-            layoutParams = LinearLayout.LayoutParams(dp(c, wDp), dp(c, hDp)).apply { marginEnd = dp(c, 26) }
+            layoutParams = LinearLayout.LayoutParams(dp(c, wDp), dp(c, hDp)).apply { marginEnd = dp(c, 18) }
             background = GradientDrawable().apply {
                 cornerRadius = radius
                 setColor(color)
@@ -101,7 +101,7 @@ object Ui {
             setOnClickListener { onClick() }
             setOnFocusChangeListener { v, has ->
                 foreground = if (has) glass else null
-                v.animate().scaleX(if (has) 1.12f else 1f).scaleY(if (has) 1.12f else 1f)
+                v.animate().scaleX(if (has) 1.15f else 1f).scaleY(if (has) 1.15f else 1f)
                     .translationY(if (has) -dp(c, 6).toFloat() else 0f)
                     .setInterpolator(android.view.animation.OvershootInterpolator(1.6f))
                     .setDuration(220).start()
@@ -190,8 +190,8 @@ object Ui {
                 orientation = LinearLayout.VERTICAL
                 gravity = Gravity.CENTER
                 addView(ImageView(c).apply { setImageDrawable(icon(c, pkg)) },
-                    LinearLayout.LayoutParams(dp(c, 60), dp(c, 60)))
-                addView(text(c, name, 15f).apply {
+                    LinearLayout.LayoutParams(dp(c, 44), dp(c, 44)))
+                addView(text(c, name, 13f).apply {
                     gravity = Gravity.CENTER
                     setPadding(0, dp(c, 8), 0, 0)
                 })
@@ -207,8 +207,8 @@ object Ui {
         addView(LinearLayout(c).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
-            addView(text(c, glyph, 34f).apply { gravity = Gravity.CENTER })
-            addView(text(c, title, 15f, Color.WHITE, MEDIUM).apply {
+            addView(text(c, glyph, 26f).apply { gravity = Gravity.CENTER })
+            addView(text(c, title, 13f, Color.WHITE, MEDIUM).apply {
                 gravity = Gravity.CENTER
                 setPadding(0, dp(c, 8), 0, 0)
             })
