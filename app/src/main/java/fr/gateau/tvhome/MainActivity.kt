@@ -205,7 +205,7 @@ class MainActivity : Activity() {
         val hide = cfg.tiles.isEmpty()
         Ui.gone(homeTitle, hide); Ui.gone(homeBox, hide)
         for (t in cfg.tiles) {
-            if (t.entity.startsWith("camera.")) homeRow.addView(cameraTile(t)) else homeRow.addView(stateTile(t))
+            if (t.entity.startsWith("camera.") || t.entity.startsWith("image.")) homeRow.addView(cameraTile(t)) else homeRow.addView(stateTile(t))
         }
 
         val target = lastKey?.let { root.findViewWithTag<View>(it) } ?: dockRow.getChildAt(0)

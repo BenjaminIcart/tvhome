@@ -42,5 +42,5 @@ rest:
 #       title: "🔔 On sonne à la porte"
 #       message: "Caméra de la sonnette"
 #       duration: 20
-#       camera: camera.sonnette
+#       camera: image.sonnette_derniere_image_du_mouvement
 # mode: single

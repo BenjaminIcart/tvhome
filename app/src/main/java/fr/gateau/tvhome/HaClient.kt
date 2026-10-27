@@ -18,7 +18,7 @@ class HaClient(base: String, private val token: String) {
         private val JSON_TYPE = "application/json; charset=utf-8".toMediaType()
 
         private val READ_ONLY = setOf(
-            "sensor", "binary_sensor", "weather", "person", "device_tracker", "sun", "zone"
+            "sensor", "binary_sensor", "weather", "person", "device_tracker", "sun", "zone", "image", "camera"
         )
 
         fun isActionable(entity: String) = entity.substringBefore('.') !in READ_ONLY && !entity.startsWith("camera.")
@@ -66,7 +66,7 @@ class HaClient(base: String, private val token: String) {
 /** Instantané d'une caméra HA (camera_proxy). */
 fun HaClient.snapshot(entity: String): android.graphics.Bitmap? = try {
     val req = okhttp3.Request.Builder()
-        .url("${baseUrl()}/api/camera_proxy/$entity")
+        .url("${baseUrl()}/api/${if (entity.startsWith("image.")) "image_proxy" else "camera_proxy"}/$entity")
         .header("Authorization", "Bearer ${authToken()}")
         .build()
     HaClient.httpClient().newCall(req).execute().use { r ->
