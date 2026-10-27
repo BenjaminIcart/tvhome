@@ -11,7 +11,7 @@ android {
         applicationId = "fr.gateau.tvhome"
         minSdk = 24
         targetSdk = 30
-        versionCode = 4
+        versionCode = 5
         versionName = "2.2"
     }
 

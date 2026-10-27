@@ -135,6 +135,15 @@ object Ui {
     }
 
     fun launch(c: Context, pkg: String): Boolean {
+        // "paquet/.Activite" : lance une activité précise (ex. la TV en direct Bbox)
+        android.content.ComponentName.unflattenFromString(pkg)?.takeIf { pkg.contains('/') }?.let { cn ->
+            return try {
+                c.startActivity(Intent(Intent.ACTION_MAIN).setComponent(cn).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                true
+            } catch (e: Exception) {
+                launch(c, cn.packageName)
+            }
+        }
         val pm = c.packageManager
         val intent = pm.getLeanbackLaunchIntentForPackage(pkg)
             ?: pm.getLaunchIntentForPackage(pkg)
