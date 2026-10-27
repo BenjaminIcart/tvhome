@@ -39,6 +39,10 @@ class MainActivity : Activity() {
     private lateinit var focusName: TextView
     private lateinit var dockRow: LinearLayout
     private lateinit var glow: GradientDrawable
+    private lateinit var wallpaper: ImageView
+    private lateinit var scrim: View
+    private var wallpaperStamp = -1L
+    private var pendingSaver = false
 
     private class TileView(val card: FrameLayout, val state: TextView)
     private val tileViews = mutableMapOf<String, TileView>()
@@ -97,10 +101,21 @@ class MainActivity : Activity() {
         cfg = ConfigStore.load(this)
         ha = if (cfg.haUrl.isNotBlank() && cfg.haToken.isNotBlank()) HaClient(cfg.haUrl, cfg.haToken) else null
         populate()
+        loadWallpaper()
         camCounter = 0
         ui.post(clockTick)
         ui.post(haTick)
         resetIdle()
+        if (pendingSaver || intent?.getBooleanExtra("saver", false) == true) {
+            pendingSaver = false
+            intent?.removeExtra("saver")
+            ui.postDelayed({ showSaver() }, 300)
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        if (intent.getBooleanExtra("saver", false)) pendingSaver = true
     }
 
     override fun onPause() {
@@ -165,7 +180,24 @@ class MainActivity : Activity() {
 
     private fun buildLayout() {
         val c = this
-        root = FrameLayout(c).apply { setBackgroundColor(Ui.BLACK) }
+        root = FrameLayout(c).apply {
+            background = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                intArrayOf(Color.parseColor("#0E1328"), Color.parseColor("#05060C"), Color.BLACK))
+        }
+        wallpaper = ImageView(c).apply {
+            scaleType = ImageView.ScaleType.CENTER_CROP
+            visibility = View.GONE
+        }
+        root.addView(wallpaper, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        addAurora(c, Color.parseColor("#5E5CE6"), 0x50, 620, Gravity.TOP or Gravity.END, -160, -220, 70f, 40f, 38_000)
+        addAurora(c, Color.parseColor("#30D5C8"), 0x30, 520, Gravity.TOP or Gravity.START, -200, 60, -50f, 60f, 46_000)
+        addAurora(c, Color.parseColor("#BF5AF2"), 0x28, 480, Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL, 0, 0, 90f, -30f, 52_000)
+        scrim = View(c).apply {
+            background = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                intArrayOf(Color.argb(0x66, 0, 0, 0), Color.argb(0x22, 0, 0, 0), Color.argb(0xCC, 0, 0, 0)))
+            visibility = View.GONE
+        }
+        root.addView(scrim, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
 
         // Lueur ambiante en bas, couleur de l'appli sélectionnée
         glow = GradientDrawable().apply {
@@ -195,8 +227,17 @@ class MainActivity : Activity() {
         date = Ui.text(c, "", 17f, Color.WHITE, Ui.LIGHT)
         left.addView(greet); left.addView(clock); left.addView(date)
         top.addView(left, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        val pills = LinearLayout(c).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
         weather = Ui.pill(c, "")
-        top.addView(weather)
+        pills.addView(weather)
+        pills.addView(Ui.focusPill(c, "⚙  Paramètres", "settings") { openSettings() },
+            LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                marginStart = Ui.dp(c, 12)
+            })
+        top.addView(pills)
         content.addView(top)
 
         // Milieu : maison
@@ -271,6 +312,59 @@ class MainActivity : Activity() {
 
         val target = lastKey?.let { root.findViewWithTag<View>(it) } ?: dockRow.getChildAt(0)
         target?.requestFocus()
+    }
+
+    private fun addAurora(c: android.content.Context, color: Int, alpha: Int, sizeDp: Int, gravity: Int,
+                          offX: Int, offY: Int, dx: Float, dy: Float, period: Long) {
+        val size = Ui.dp(c, sizeDp)
+        val v = View(c).apply {
+            background = GradientDrawable().apply {
+                gradientType = GradientDrawable.RADIAL_GRADIENT
+                gradientRadius = size / 2f
+                colors = intArrayOf(Color.argb(alpha, Color.red(color), Color.green(color), Color.blue(color)), Color.TRANSPARENT)
+            }
+        }
+        root.addView(v, FrameLayout.LayoutParams(size, size, gravity).apply {
+            leftMargin = Ui.dp(c, offX); rightMargin = Ui.dp(c, offX)
+            topMargin = Ui.dp(c, offY); bottomMargin = Ui.dp(c, -sizeDp / 3)
+        })
+        // Dérive très lente (une seule animation matérielle, aucun coût réseau)
+        android.animation.ObjectAnimator.ofPropertyValuesHolder(v,
+            android.animation.PropertyValuesHolder.ofFloat("translationX", 0f, Ui.dp(c, dx.toInt()).toFloat()),
+            android.animation.PropertyValuesHolder.ofFloat("translationY", 0f, Ui.dp(c, dy.toInt()).toFloat()),
+        ).apply {
+            duration = period
+            repeatMode = android.animation.ValueAnimator.REVERSE
+            repeatCount = android.animation.ValueAnimator.INFINITE
+            interpolator = android.view.animation.AccelerateDecelerateInterpolator()
+            start()
+        }
+    }
+
+    /** Fond d'écran perso : fichier wallpaper.jpg à côté de config.json. */
+    private fun loadWallpaper() {
+        val f = java.io.File(ConfigStore.file(this).parentFile, "wallpaper.jpg")
+        val stamp = if (f.exists()) f.lastModified() else 0L
+        if (stamp == wallpaperStamp) return
+        wallpaperStamp = stamp
+        val bmp = if (f.exists()) try {
+            val o = android.graphics.BitmapFactory.Options().apply { inSampleSize = 2 }
+            android.graphics.BitmapFactory.decodeFile(f.absolutePath, o)
+        } catch (e: Exception) { null } else null
+        wallpaper.setImageBitmap(bmp)
+        Ui.gone(wallpaper, bmp == null)
+        Ui.gone(scrim, bmp == null)
+    }
+
+    private fun openSettings() {
+        val tries = listOf(
+            Intent(android.provider.Settings.ACTION_SETTINGS),
+            Intent().setClassName("com.android.tv.settings", "com.android.tv.settings.MainSettings"),
+        )
+        for (i in tries) {
+            try { startActivity(i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)); return } catch (e: Exception) {}
+        }
+        toast("Paramètres introuvables")
     }
 
     private fun liveCard(tvColor: Int): View {

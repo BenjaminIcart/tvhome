@@ -55,6 +55,27 @@ object Ui {
         }
     }
 
+    /** Pilule givrée focusable (boutons du haut). */
+    fun focusPill(c: Context, s: String, key: String, onClick: () -> Unit): TextView {
+        val bg = GradientDrawable().apply {
+            cornerRadius = dp(c, 50).toFloat()
+            setColor(PILL)
+        }
+        return text(c, s, 18f, Color.WHITE, LIGHT).apply {
+            tag = key
+            setPadding(dp(c, 18), dp(c, 9), dp(c, 18), dp(c, 9))
+            background = bg
+            isFocusable = true
+            isClickable = true
+            setOnClickListener { onClick() }
+            setOnFocusChangeListener { v, has ->
+                bg.setColor(if (has) Color.WHITE else PILL)
+                setTextColor(if (has) Color.BLACK else Color.WHITE)
+                v.animate().scaleX(if (has) 1.08f else 1f).scaleY(if (has) 1.08f else 1f).setDuration(150).start()
+            }
+        }
+    }
+
     fun hrow(c: Context, padV: Int = 18): Pair<HorizontalScrollView, LinearLayout> {
         val row = LinearLayout(c).apply {
             orientation = LinearLayout.HORIZONTAL
