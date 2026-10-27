@@ -215,6 +215,23 @@ object Ui {
         }, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
     }
 
+    /** Petite icône TV vectorielle (écran + pied), sans emoji. */
+    fun tvIcon(c: Context): View = object : View(c) {
+        private val p = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.WHITE
+            style = android.graphics.Paint.Style.STROKE
+            strokeWidth = dp(c, 2).toFloat()
+            strokeCap = android.graphics.Paint.Cap.ROUND
+        }
+        override fun onDraw(canvas: Canvas) {
+            val w = width.toFloat(); val h = height.toFloat(); val s = p.strokeWidth
+            val r = dp(c, 4).toFloat()
+            canvas.drawRoundRect(s, s, w - s, h * 0.78f, r, r, p)
+            canvas.drawLine(w * 0.32f, h - s, w * 0.68f, h - s, p)
+            canvas.drawLine(w * 0.5f, h * 0.78f, w * 0.5f, h - s, p)
+        }
+    }
+
     fun background(): Drawable = GradientDrawable().apply { setColor(BLACK) }
 
     fun gone(v: View, hide: Boolean) { v.visibility = if (hide) View.GONE else View.VISIBLE }

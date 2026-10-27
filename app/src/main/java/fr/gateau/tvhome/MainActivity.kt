@@ -157,10 +157,12 @@ class MainActivity : Activity() {
                 cornerRadius = Ui.dp(c, 28).toFloat()
                 setColor(Ui.BAND)
             }
-            clipChildren = false
-            clipToPadding = false
+            clipToOutline = true
+            clipChildren = true
         }
-        val (db, dr) = Ui.hrow(c, padV = 16)
+        val (db, dr) = Ui.hrow(c, padV = 18)
+        db.isHorizontalFadingEdgeEnabled = true
+        db.setFadingEdgeLength(Ui.dp(c, 48))
         dockRow = dr
         band.addView(db)
         content.addView(band, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
@@ -183,11 +185,8 @@ class MainActivity : Activity() {
         val c = this
         dockRow.removeAllViews()
 
-        val tvColor = Color.parseColor("#3A6FF7")
-        dockRow.addView(Ui.glyphCard(c, "📺", "TV en direct", 176, 99, tvColor, "live",
-            onDockFocus("live", "TV en direct", null, tvColor)) {
-            if (!Ui.launch(c, cfg.liveTvPackage)) toast("Impossible d'ouvrir ${cfg.liveTvPackage}")
-        })
+        val tvColor = Color.parseColor("#0A84FF")
+        dockRow.addView(liveCard(tvColor))
         for (pkg in cfg.favorites) {
             val name = Ui.label(c, pkg) ?: continue
             val b = Ui.banner(c, pkg) ?: Ui.icon(c, pkg)
@@ -210,6 +209,58 @@ class MainActivity : Activity() {
 
         val target = lastKey?.let { root.findViewWithTag<View>(it) } ?: dockRow.getChildAt(0)
         target?.requestFocus()
+    }
+
+    private fun liveCard(tvColor: Int): View {
+        val c = this
+        val card = Ui.card(c, 176, 99, Color.TRANSPARENT, "live",
+            onDockFocus("live", "TV en direct", null, tvColor)) {
+            if (!Ui.launch(c, cfg.liveTvPackage)) toast("Impossible d'ouvrir ${cfg.liveTvPackage}")
+        }
+        card.background = GradientDrawable(GradientDrawable.Orientation.TL_BR,
+            intArrayOf(Color.parseColor("#0A84FF"), Color.parseColor("#5E5CE6"), Color.parseColor("#BF5AF2"))).apply {
+            cornerRadius = Ui.dp(c, 16).toFloat()
+        }
+        // Reflet léger en haut
+        card.addView(View(c).apply {
+            background = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                intArrayOf(Color.argb(0x38, 0xFF, 0xFF, 0xFF), Color.TRANSPARENT))
+        }, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, Ui.dp(c, 45), Gravity.TOP))
+        // Badge « EN DIRECT » avec point rouge qui pulse
+        val dot = View(c).apply {
+            background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(Color.parseColor("#FF453A")) }
+        }
+        val badge = LinearLayout(c).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(Ui.dp(c, 8), Ui.dp(c, 3), Ui.dp(c, 9), Ui.dp(c, 3))
+            background = GradientDrawable().apply {
+                cornerRadius = Ui.dp(c, 20).toFloat()
+                setColor(Color.argb(0x59, 0, 0, 0))
+            }
+            addView(dot, LinearLayout.LayoutParams(Ui.dp(c, 7), Ui.dp(c, 7)).apply { marginEnd = Ui.dp(c, 5) })
+            addView(Ui.text(c, "EN DIRECT", 9f, Color.WHITE, Ui.MEDIUM).apply { letterSpacing = 0.12f })
+        }
+        card.addView(badge, FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT,
+            Gravity.TOP or Gravity.START).apply { leftMargin = Ui.dp(c, 10); topMargin = Ui.dp(c, 10) })
+        android.animation.ObjectAnimator.ofFloat(dot, "alpha", 1f, 0.25f).apply {
+            duration = 900
+            repeatMode = android.animation.ValueAnimator.REVERSE
+            repeatCount = android.animation.ValueAnimator.INFINITE
+            start()
+        }
+        // Icône TV dessinée + titre
+        card.addView(Ui.tvIcon(c), FrameLayout.LayoutParams(Ui.dp(c, 34), Ui.dp(c, 28),
+            Gravity.TOP or Gravity.END).apply { rightMargin = Ui.dp(c, 12); topMargin = Ui.dp(c, 10) })
+        card.addView(LinearLayout(c).apply {
+            orientation = LinearLayout.VERTICAL
+            addView(Ui.text(c, "TV en direct", 17f, Color.WHITE, Ui.MEDIUM))
+            addView(Ui.text(c, "Bouygues Telecom", 11f, Color.argb(0xC0, 0xFF, 0xFF, 0xFF), Ui.LIGHT).apply {
+                setPadding(0, Ui.dp(c, 2), 0, 0)
+            })
+        }, FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT,
+            Gravity.BOTTOM or Gravity.START).apply { leftMargin = Ui.dp(c, 12); bottomMargin = Ui.dp(c, 10) })
+        return card
     }
 
     private fun homeFocus(key: String, name: String) = { has: Boolean ->
