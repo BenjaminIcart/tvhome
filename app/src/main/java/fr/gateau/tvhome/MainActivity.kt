@@ -47,6 +47,7 @@ class MainActivity : Activity() {
     private lateinit var ramIcon: TextView
     private lateinit var tempText: TextView
     private lateinit var tempPill: View
+    private lateinit var tempIcon: TextView
     private lateinit var upText: TextView
     private lateinit var homeBox: View
     private lateinit var homeRow: LinearLayout
@@ -84,8 +85,13 @@ class MainActivity : Activity() {
         setIfChanged(ramText, "RAM $pct %")
         ramIcon.setTextColor(when { pct >= 90 -> Color.parseColor("#FF453A"); pct >= 80 -> Color.parseColor("#FF9F0A"); else -> Color.WHITE })
         val t = SysInfo.tempC()
-        Ui.gone(tempPill, t == null)
-        if (t != null) setIfChanged(tempText, String.format(Locale.FRANCE, "%.0f °C", t))
+        val th = SysInfo.thermal(this)
+        Ui.gone(tempPill, t == null && th == null)
+        when {
+            t != null -> setIfChanged(tempText, String.format(Locale.FRANCE, "%.0f °C", t))
+            th != null -> setIfChanged(tempText, th.first)
+        }
+        tempIcon.setTextColor(th?.second ?: Color.WHITE)
         setIfChanged(upText, SysInfo.uptimeText())
     }
 
@@ -209,7 +215,10 @@ class MainActivity : Activity() {
         }
 
         // Haut : salutation / heure / date  |  météo + paramètres
-        val top = LinearLayout(c).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.TOP }
+        val top = LinearLayout(c).apply {
+            orientation = LinearLayout.HORIZONTAL; gravity = Gravity.TOP
+            clipChildren = false; clipToPadding = false
+        }
         val left = LinearLayout(c).apply { orientation = LinearLayout.VERTICAL }
         greet = Ui.text(c, "", 26f, Color.argb(0xB3, 0xFF, 0xFF, 0xFF), Ui.REGULAR)
         clock = Ui.text(c, "--:--", 100f, Color.WHITE, Ui.LIGHT).apply {
@@ -220,7 +229,11 @@ class MainActivity : Activity() {
         left.addView(greet); left.addView(clock); left.addView(date)
         top.addView(left, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
 
-        val pills = LinearLayout(c).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+        val pills = LinearLayout(c).apply {
+            orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
+            clipChildren = false; clipToPadding = false
+            setPadding(Ui.dp(c, 8), Ui.dp(c, 6), Ui.dp(c, 6), Ui.dp(c, 6))
+        }
         val (wp, wi, wt) = Ui.iconPill(c, "weather-cloudy", "")
         weatherPill = wp; weatherIcon = wi; weatherText = wt
         pills.addView(wp)
@@ -228,12 +241,15 @@ class MainActivity : Activity() {
         pills.addView(sp, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
             marginStart = Ui.dp(c, 12)
         })
-        val right = LinearLayout(c).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.END }
+        val right = LinearLayout(c).apply {
+            orientation = LinearLayout.VERTICAL; gravity = Gravity.END
+            clipChildren = false; clipToPadding = false
+        }
         right.addView(pills)
         val stats = LinearLayout(c).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL or Gravity.END
-            setPadding(0, Ui.dp(c, 12), 0, 0)
+            setPadding(0, Ui.dp(c, 6), Ui.dp(c, 6), 0)
         }
         fun stat(icon: String): Triple<LinearLayout, TextView, TextView> {
             val t = Ui.iconPill(c, icon, "")
@@ -247,7 +263,7 @@ class MainActivity : Activity() {
             return t
         }
         stat("memory").let { ramIcon = it.second; ramText = it.third }
-        stat("thermometer").let { tempPill = it.first; tempText = it.third }
+        stat("thermometer").let { tempPill = it.first; tempIcon = it.second; tempText = it.third }
         stat("power").let { upText = it.third }
         right.addView(stats)
         top.addView(right)

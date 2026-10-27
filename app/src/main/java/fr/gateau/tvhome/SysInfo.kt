@@ -29,6 +29,18 @@ object SysInfo {
         return best
     }
 
+    /** État thermique Android (API 29+) : libellé + couleur. */
+    fun thermal(c: Context): Pair<String, Int>? {
+        if (android.os.Build.VERSION.SDK_INT < 29) return null
+        val pm = c.getSystemService(Context.POWER_SERVICE) as android.os.PowerManager
+        return when (pm.currentThermalStatus) {
+            android.os.PowerManager.THERMAL_STATUS_NONE -> "Normal" to android.graphics.Color.WHITE
+            android.os.PowerManager.THERMAL_STATUS_LIGHT -> "Tiède" to android.graphics.Color.parseColor("#FFD60A")
+            android.os.PowerManager.THERMAL_STATUS_MODERATE -> "Chaud" to android.graphics.Color.parseColor("#FF9F0A")
+            else -> "Très chaud" to android.graphics.Color.parseColor("#FF453A")
+        }
+    }
+
     fun uptimeMs(): Long = SystemClock.elapsedRealtime()
 
     fun uptimeText(): String {

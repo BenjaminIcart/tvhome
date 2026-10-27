@@ -111,6 +111,7 @@ class BridgeService : Service() {
             .put("ram_pct", SysInfo.ram(this).first)
             .put("ram_free_mb", SysInfo.ram(this).second)
             .put("temp_c", SysInfo.tempC() ?: JSONObject.NULL)
+            .put("thermal", SysInfo.thermal(this)?.first ?: JSONObject.NULL)
             .put("uptime_min", SysInfo.uptimeMs() / 60_000)
             .put("version", 1)
     }
